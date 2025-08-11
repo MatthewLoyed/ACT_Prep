@@ -1,0 +1,27 @@
+[
+  {
+    "id": "sci-1",
+    "prompt": "According to the data table, which sample showed the greatest increase in temperature?",
+    "choices": ["Sample A", "Sample B", "Sample C", "Sample D"],
+    "answerIndex": 2
+  },
+  {
+    "id": "sci-2",
+    "prompt": "Which hypothesis is best supported by the graph’s trend?",
+    "choices": [
+      "Increasing enzyme concentration always decreases rate.",
+      "The rate initially increases with concentration, then levels off.",
+      "Rate is unaffected by concentration.",
+      "Rate and concentration are inversely proportional."
+    ],
+    "answerIndex": 1
+  },
+  {
+    "id": "sci-3",
+    "prompt": "Which experimental change would best control for heat loss?",
+    "choices": ["Use a larger beaker", "Insulate the container", "Decrease the sample size", "Increase stirring speed"],
+    "answerIndex": 1
+  }
+]
+
+

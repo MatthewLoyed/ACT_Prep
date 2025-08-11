@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* App shell defaults */
+html, body, #root {
+  height: 100%;
+}
+body {
+  @apply bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100 antialiased;
+}
+
+/* Brand palette (tweak to match your logo) */
+:root {
+  --brand-from: 219 100% 61%; /* sky-500 */
+  --brand-to: 259 94% 61%;   /* violet-500 */
+}
+.dark:root {
+  --brand-from: 204 94% 50%;
+  --brand-to: 262 83% 58%;
+}
+
+.brand-gradient {
+  background-image: linear-gradient(to bottom right, hsl(var(--brand-from)), hsl(var(--brand-to)));
+}
+
+/* Reusable utility classes */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-500 dark:focus-visible:ring-sky-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.99];
+}
+.btn-primary {
+  @apply text-white shadow-[0_8px_22px_-8px_rgba(59,130,246,0.5)] hover:shadow-[0_10px_26px_-10px_rgba(59,130,246,0.55)];
+  background-image: linear-gradient(to bottom right, hsl(var(--brand-from)), hsl(var(--brand-to)));
+}
+.btn-ghost {
+  @apply bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:bg-white/80 dark:hover:bg-slate-900/80;
+}
+.card {
+  @apply rounded-2xl border border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/70;
+}
+
+/* Answer option base styles */
+.choice {
+  @apply w-full text-left rounded-xl border px-4 py-3 transition-colors select-none cursor-pointer shadow-sm border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70;
+}
+.choice-correct {
+  @apply bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-200;
+}
+.choice-incorrect {
+  @apply bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-900/30 dark:border-rose-700 dark:text-rose-200;
+}

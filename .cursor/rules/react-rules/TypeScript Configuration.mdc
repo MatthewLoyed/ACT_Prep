@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+Enable "strict": true in tsconfig.json.
+
+Explicitly type function returns and object literals.
+
+Enforce noImplicitAny, strictNullChecks, strictFunctionTypes.
+
+Minimize use of @ts-ignore/@ts-expect-error.
