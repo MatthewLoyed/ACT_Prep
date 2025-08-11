@@ -743,14 +743,7 @@ export default function ImportTest() {
     return e === -1 ? tail : tail.slice(0, e)
   }
 
-  function download(section: Extracted) {
-    const blob = new Blob([JSON.stringify(section.questions, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${section.section}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
+
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

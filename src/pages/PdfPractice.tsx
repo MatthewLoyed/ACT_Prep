@@ -162,7 +162,7 @@ export default function PdfPractice() {
         // console.log(`Filtered numbers:`, nums)
         
         // Also try a broader search for any numbers that might be questions
-        const allNumbers = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})[.)]/g))
+        // const allNumbers = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})[.)]/g))
         // console.log(`All numbers found:`, allNumbers.map(m => ({
         //   num: m[1],
         //   context: text.substring(Math.max(0, m.index - 20), m.index + 50)
