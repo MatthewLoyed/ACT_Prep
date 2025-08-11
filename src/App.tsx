@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import './index.css'
@@ -12,7 +12,8 @@ const FullTestSetup = lazy(() => import('./pages/FullTestSetup'))
 const FullTest = lazy(() => import('./pages/FullTest'))
 const History = lazy(() => import('./pages/History'))
 const ImportTest = lazy(() => import('./pages/ImportTest'))
-const ChooseTest = lazy(() => import('./pages/ChooseTest'))
+const Practice = lazy(() => import('./pages/Practice'))
+const TestSelection = lazy(() => import('./pages/TestSelection'))
 const EnglishPassageView = lazy(() => import('./pages/EnglishPassageView'))
 const PdfPageViewer = lazy(() => import('./pages/PdfPageViewer'))
 const PdfPractice = lazy(() => import('./pages/PdfPractice'))
@@ -20,6 +21,8 @@ const PdfPracticeSetup = lazy(() => import('./pages/PdfPracticeSetup'))
 
 function App() {
   const [darkMode, setDarkMode] = useState<boolean>(false)
+  const [isNavVisible, setIsNavVisible] = useState(true)
+  const lastScrollY = useRef(0)
 
   useEffect(() => {
     const stored = localStorage.getItem('darkMode')
@@ -36,25 +39,47 @@ function App() {
     localStorage.setItem('darkMode', String(darkMode))
   }, [darkMode])
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // Show nav when scrolling up, hide when scrolling down
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setIsNavVisible(false)
+      } else if (currentScrollY < lastScrollY.current) {
+        setIsNavVisible(true)
+      }
+      
+      lastScrollY.current = currentScrollY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
     <BrowserRouter>
-      <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 transition-colors">
-        <header className="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur">
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="h-9 w-9 rounded-xl brand-gradient" />
-              <span className="font-semibold">ACT Prep</span>
+      <div className="min-h-dvh bg-gradient-to-br from-white via-slate-25 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors">
+        <motion.header 
+          className="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 backdrop-blur-lg shadow-lg"
+          initial={{ y: 0 }}
+          animate={{ y: isNavVisible ? 0 : -100 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+          <div className="max-w-7xl mx-auto px-9 py-5 flex items-center justify-between">
+            <Link to="/" className="group">
+              <span className="text-5xl font-black bg-gradient-to-r from-sky-600 via-purple-600 to-emerald-600 bg-clip-text text-transparent tracking-tight hover:scale-105 transition-transform duration-200">
+                ACT PREP
+              </span>
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-1 justify-end">
               <Nav />
-              <a className="btn btn-ghost" href="/pdf?url=/practice_tests/Preparing-for-the-ACT.pdf">PDF view</a>
-              <a className="btn btn-ghost" href="/pdf-practice-setup">PDF practice</a>
-              <button className="btn btn-ghost" onClick={() => setDarkMode(v => !v)}>
+              {/* <button className="btn btn-ghost" onClick={() => setDarkMode(v => !v)}>
                 {darkMode ? 'Light' : 'Dark'}
-              </button>
+              </button> */}
             </div>
           </div>
-        </header>
+        </motion.header>
 
         <main className="max-w-7xl mx-auto px-4 py-6">
           <Suspense fallback={<div className="text-center py-20">Loading…</div>}>
@@ -87,8 +112,11 @@ function App() {
                 <Route path="/import" element={<PageFade>
                   <ImportTest />
                 </PageFade>} />
-                <Route path="/choose-test" element={<PageFade>
-                  <ChooseTest />
+                <Route path="/practice" element={<PageFade>
+                  <Practice />
+                </PageFade>} />
+                <Route path="/test-selection/:testId" element={<PageFade>
+                  <TestSelection />
                 </PageFade>} />
                 <Route path="/english-passages" element={<PageFade>
                   <EnglishPassageView />
@@ -115,10 +143,13 @@ function App() {
 function PageFade({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, y: 20, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.98 }}
+      transition={{ 
+        duration: 0.4,
+        ease: [0.4, 0.0, 0.2, 1]
+      }}
     >
       {children}
     </motion.div>
@@ -134,20 +165,23 @@ function Nav() {
     return (
       <Link
         to={to}
-        className={`hidden sm:inline-flex items-center rounded-xl px-3 py-1.5 text-sm transition-colors ${active ? 'brand-gradient text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+        className={`hidden sm:inline-flex items-center rounded-xl px-9 py-4 text-xl font-bold transition-all duration-200 ${
+          active 
+            ? 'brand-gradient text-white shadow-lg scale-105' 
+            : 'hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105 hover:shadow-md'
+        }`}
       >
         {label}
       </Link>
     )
   }
-  return (
-    <nav className="flex items-center gap-1.5">
-      {link('/', 'Home')}
-      {link('/subjects', 'Subjects')}
-      {link('/full-test-setup', 'Full Test')}
-      {link('/history', 'History')}
-      {link('/choose-test', 'Choose Test')}
-      {link('/import', 'Import')}
-    </nav>
-  )
+      return (
+      <nav className="flex items-center gap-6">
+        {link('/', 'Home')}
+        {link('/import', 'Import PDF')}
+        {link('/practice', 'Practice')}
+        {link('/full-test-setup', 'Full Test')}
+        {link('/history', 'History')}
+      </nav>
+    )
 }

@@ -42,6 +42,10 @@ export function getActiveTest(): TestBundle | null {
   return listTests().find(t => t.id === id) ?? null
 }
 
+export function getTest(id: string): TestBundle | null {
+  return listTests().find(t => t.id === id) ?? null
+}
+
 export function getNextDefaultName(): string {
   const tests = listTests()
   let n = 1

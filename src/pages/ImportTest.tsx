@@ -73,6 +73,18 @@ export default function ImportTest() {
     const reading = readingText ? extractReading(readingText) : extractReading(combined)
     if (reading.questions.length) sections.push(reading)
 
+    // Auto-save to library if we have any sections
+    if (sections.length > 0) {
+      setStatus('Auto-saving to library...')
+      const name = getNextDefaultName()
+      const sectionsRecord: Record<string, Extracted['questions']> = {}
+      for (const sec of sections) sectionsRecord[sec.section] = sec.questions
+      const saved = saveTest({ name, sections: sectionsRecord })
+      setStatus(`✅ Auto-saved as "${saved.name}"! You can now start testing.`)
+    } else {
+      setStatus('No test sections found. Please check your PDF.')
+    }
+
     // Extract and assign answer keys for each section separately
     console.log('Extracting answer keys for each section...')
     
@@ -746,47 +758,67 @@ export default function ImportTest() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h2 className="text-2xl font-semibold">Import practice test (PDF)</h2>
-      <p className="text-slate-600 dark:text-slate-300 mb-4">Start with Math/Reading/English. Science can be added later with images.</p>
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent">
+          Import Practice Test
+        </h2>
+        <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
+          Upload your ACT PDF and we'll automatically extract questions for Math, Reading, and English sections.
+        </p>
+      </div>
 
-      <div className="card p-5">
-        <div className="flex items-center gap-3">
-          <input ref={inputRef} type="file" accept="application/pdf" onChange={onFile} className="hidden" />
-          <button className="btn btn-primary" onClick={() => inputRef.current?.click()}>Choose PDF</button>
-          <div className="text-sm text-slate-600 dark:text-slate-400">{status}</div>
+      <div className="card p-8 text-center">
+        <div className="mb-6">
+          <div className="text-6xl mb-4">📄</div>
+          <h3 className="text-2xl font-semibold mb-2">Ready to Import?</h3>
+          <p className="text-slate-600 dark:text-slate-400">
+            Simply upload your ACT practice test PDF and we'll handle the rest
+          </p>
         </div>
+        <div className="flex items-center justify-center gap-4">
+          <input ref={inputRef} type="file" accept="application/pdf" onChange={onFile} className="hidden" />
+          <button 
+            className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200" 
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose PDF File
+          </button>
+        </div>
+        <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">{status}</div>
       </div>
 
       {results.length > 0 && (
         <div className="mt-6 space-y-4">
-          <div className="card p-5 flex items-center justify-between">
-            <div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">Ready to save</div>
-              <div className="font-semibold">{getNextDefaultName()}</div>
-            </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                const name = getNextDefaultName()
-                const sections: Record<string, Extracted['questions']> = {}
-                for (const sec of results) sections[sec.section] = sec.questions
-                const saved = saveTest({ name, sections })
-                setStatus(`Saved as ${saved.name}. You can now select it from the Choose Test page.`)
-              }}
-            >
-              Save to Library
-            </button>
-          </div>
-          {results.map((sec) => (
-            <div key={sec.section} className="card p-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold capitalize">{sec.section}</h3>
-                <button className="btn btn-ghost" onClick={() => download(sec)}>Download {sec.section}.json</button>
+          <div className="card p-5">
+            <div className="text-center">
+              <div className="text-2xl mb-2">✅</div>
+              <div className="font-semibold text-lg mb-2">Test Successfully Imported!</div>
+              <div className="text-slate-600 dark:text-slate-400 mb-4">
+                Your test has been automatically saved to your library.
               </div>
-              <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">Extracted {sec.questions.length} questions</div>
+              <button
+                className="btn btn-primary"
+                onClick={() => window.location.href = '/practice'}
+              >
+                Start Practicing
+              </button>
             </div>
-          ))}
+          </div>
+          
+          <div className="card p-5">
+            <h3 className="text-lg font-semibold mb-3">Extraction Summary</h3>
+            {results.map((sec) => (
+              <div key={sec.section} className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+                <div>
+                  <span className="font-medium capitalize">{sec.section}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400 ml-2">
+                    {sec.questions.length} questions
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

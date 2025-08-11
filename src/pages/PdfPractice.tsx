@@ -25,7 +25,7 @@ export default function PdfPractice() {
   const [params] = useSearchParams()
   const pdfUrl = params.get('url') || '/practice_tests/Preparing-for-the-ACT.pdf'
 
-  console.log(`PdfPractice: Current subject = ${subject}`)
+  // console.log(`PdfPractice: Current subject = ${subject}`)
 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [pageNum, setPageNum] = useState<number>(1)
@@ -55,7 +55,7 @@ export default function PdfPractice() {
 
   // Reset all state when subject changes to prevent data corruption
   useEffect(() => {
-    console.log(`Subject changed to: ${subject} - Resetting all state`)
+    // console.log(`Subject changed to: ${subject} - Resetting all state`)
     setPageQuestionNums([])
     setAnswers({})
     setFeedback(null)
@@ -100,15 +100,15 @@ export default function PdfPractice() {
           if (sectionMatch) {
             // For reading, start on the section header page (even if no questions)
             if (subject === 'reading') {
-              console.log(`READING TEST section found on page ${i} - setting as starting page`)
-              console.log(`READING DEBUG: Page ${i} text preview: "${text.substring(0, 200)}..."`)
+              // console.log(`READING TEST section found on page ${i} - setting as starting page`)
+              // console.log(`READING DEBUG: Page ${i} text preview: "${text.substring(0, 200)}..."`)
               if (mounted) setPageNum(i)
               break
             } else {
               // For other sections, look for actual questions with answer choices
               const hasQuestions = /\d{1,2}[.)]\s+[^]*?[A-DFGHJ][.)]\s+/.test(text)
               if (hasQuestions) {
-                console.log(`${subject.toUpperCase()} section found on page ${i} - setting as starting page`)
+                // console.log(`${subject.toUpperCase()} section found on page ${i} - setting as starting page`)
                 if (mounted) setPageNum(i)
                 break
               }
@@ -141,10 +141,10 @@ export default function PdfPractice() {
       
       // For reading, also try a more flexible pattern since questions might be shorter
       if (subject === 'reading' && nums.length === 0) {
-        console.log('No reading questions found with standard pattern, trying flexible pattern...')
+        // console.log('No reading questions found with standard pattern, trying flexible pattern...')
         questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
         nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 36)
-        console.log(`Reading flexible pattern found: ${nums.length} questions`)
+        // console.log(`Reading flexible pattern found: ${nums.length} questions`)
       }
       
       // Use all question matches without page boundary filtering
@@ -152,44 +152,44 @@ export default function PdfPractice() {
       
       // Debug for page 27 specifically
       if (pageNum === 27) {
-        console.log(`=== PAGE 27 DEBUG ===`)
-        console.log(`Raw text preview:`, text.substring(0, 500))
-        console.log(`All question matches:`, questionMatches.map(m => ({
-          num: m[1],
-          fullMatch: m[0].substring(0, 100),
-          index: m.index
-        })))
-        console.log(`Filtered numbers:`, nums)
+        // console.log(`=== PAGE 27 DEBUG ===`)
+        // console.log(`Raw text preview:`, text.substring(0, 500))
+        // console.log(`All question matches:`, questionMatches.map(m => ({
+        //   num: m[1],
+        //   fullMatch: m[0].substring(0, 100),
+        //   index: m.index
+        // })))
+        // console.log(`Filtered numbers:`, nums)
         
         // Also try a broader search for any numbers that might be questions
         const allNumbers = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})[.)]/g))
-        console.log(`All numbers found:`, allNumbers.map(m => ({
-          num: m[1],
-          context: text.substring(Math.max(0, m.index - 20), m.index + 50)
-        })))
+        // console.log(`All numbers found:`, allNumbers.map(m => ({
+        //   num: m[1],
+        //   context: text.substring(Math.max(0, m.index - 20), m.index + 50)
+        // })))
       }
       
       // Debug for questions 22 and 44 specifically
       if (nums.includes(22) || nums.includes(44)) {
-        console.log(`=== QUESTIONS 22/44 DEBUG ===`)
-        console.log(`Page ${pageNum} detected questions:`, nums)
-        console.log(`Question 22 detected:`, nums.includes(22))
-        console.log(`Question 44 detected:`, nums.includes(44))
+        // console.log(`=== QUESTIONS 22/44 DEBUG ===`)
+        // console.log(`Page ${pageNum} detected questions:`, nums)
+        // console.log(`Question 22 detected:`, nums.includes(22))
+        // console.log(`Question 44 detected:`, nums.includes(44))
       }
       
       // Debug for reading questions specifically
       if (subject === 'reading') {
-        console.log(`=== READING QUESTIONS DEBUG ===`)
-        console.log(`Page ${pageNum} detected reading questions:`, nums)
-        console.log(`Question matches:`, questionMatches.map(m => ({
-          num: m[1],
-          fullMatch: m[0].substring(0, 100),
-          index: m.index
-        })))
+        // console.log(`=== READING QUESTIONS DEBUG ===`)
+        // console.log(`Page ${pageNum} detected reading questions:`, nums)
+        // console.log(`Question matches:`, questionMatches.map(m => ({
+        //   num: m[1],
+        //   fullMatch: m[0].substring(0, 100),
+        //   index: m.index
+        // })))
         
         // Show sample of detected questions
         if (nums.length > 0) {
-          console.log(`Sample reading questions on page ${pageNum}:`, nums.slice(0, 5))
+          // console.log(`Sample reading questions on page ${pageNum}:`, nums.slice(0, 5))
         }
       }
       
@@ -203,12 +203,12 @@ export default function PdfPractice() {
         const isReadingTestStart = subject === 'reading' && /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
         
         if (!isReadingTestStart) {
-          console.log(`Auto-skipping page ${pageNum} (no questions detected)`)
+          // console.log(`Auto-skipping page ${pageNum} (no questions detected)`)
           setLastAutoSkip(pageNum)
           setTimeout(() => setPageNum(p => Math.min(pdf.numPages, p + 1)), 0)
           return
         } else {
-          console.log(`READING DEBUG: Staying on reading test start page ${pageNum} (no questions but test start detected)`)
+          // console.log(`READING DEBUG: Staying on reading test start page ${pageNum} (no questions but test start detected)`)
         }
       }
 
@@ -220,10 +220,10 @@ export default function PdfPractice() {
       
       // Debug: log when we see "END OF TEST" 
       if (hasEndOfTest) {
-        console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${uniqueNums.join(', ')}]`)
+        // console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${uniqueNums.join(', ')}]`)
       }
 
-      console.log(`Rendering page ${pageNum}, detected questions: [${uniqueNums.join(', ')}]`)
+      // console.log(`Rendering page ${pageNum}, detected questions: [${uniqueNums.join(', ')}]`)
       
       // Clear manual advance flag after a delay to allow auto-skip on subsequent pages
       if (lastManualAdvance === pageNum) {
@@ -305,17 +305,17 @@ export default function PdfPractice() {
         if (num > 0 && questionSlots.has(num)) {
           questionSlots.set(num, q)
           if (pageNum === 27) {
-            console.log(`Mapped question ${num} to ${q.id}`)
+            // console.log(`Mapped question ${num} to ${q.id}`)
           }
           
           // Debug for reading questions
           if (subject === 'reading' && (num === 1 || num === 10 || num === 20 || num === 30)) {
-            console.log(`Reading question ${num} mapped:`, {
-              id: q.id,
-              prompt: q.prompt.substring(0, 100) + '...',
-              choices: q.choices,
-              answerIndex: q.answerIndex
-            })
+            // console.log(`Reading question ${num} mapped:`, {
+            //   id: q.id,
+            //   prompt: q.prompt.substring(0, 100) + '...',
+            //   choices: q.choices,
+            //   answerIndex: q.answerIndex
+            // })
           }
         }
       }
@@ -325,22 +325,22 @@ export default function PdfPractice() {
     
    
     
-    console.log(`Page ${pageNum}: ${subject} questions [${ordered.map(q => q.id).join(', ')}]`)
+    // console.log(`Page ${pageNum}: ${subject} questions [${ordered.map(q => q.id).join(', ')}]`)
     
     // Debug: show question details for Math
     if (subject === 'math' && ordered.length > 0) {
-      console.log(`${subject} questions on page ${pageNum}:`)
-      ordered.forEach(q => {
-        console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
-      })
+      // console.log(`${subject} questions on page ${pageNum}:`)
+      // ordered.forEach(q => {
+      //   console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
+      // })
     }
     
     // Debug: show question details for Math
     if (subject === 'math' && ordered.length > 0) {
-      console.log(`${subject} questions on page ${pageNum}:`)
-      ordered.forEach(q => {
-        console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
-      })
+      // console.log(`${subject} questions on page ${pageNum}:`)
+      // ordered.forEach(q => {
+      //   console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
+      // })
     }
     
     return ordered
@@ -417,7 +417,21 @@ export default function PdfPractice() {
   }, [current])
 
   return (
-    <div className="grid lg:grid-cols-[3fr_1fr] gap-4">
+    <div className="h-dvh flex flex-col">
+      {/* Test Title Bar */}
+      <div className="bg-gradient-to-r from-sky-600 to-purple-600 text-white p-4 text-center">
+        <h1 className="text-3xl font-bold tracking-wide">
+          {subject?.toUpperCase()} TEST
+        </h1>
+        <p className="text-sky-100 mt-1">
+          {subject === 'english' && '35 Minutes — 50 Questions'}
+          {subject === 'math' && '50 Minutes — 45 Questions'}
+          {subject === 'reading' && '40 Minutes — 36 Questions'}
+          {subject === 'science' && '40 Minutes — 40 Questions'}
+        </p>
+      </div>
+      
+      <div className="flex-1 grid lg:grid-cols-[3fr_1fr] gap-4 p-4">
       <div ref={leftPaneRef} className="card p-2 overflow-auto">
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="text-sm">Page {pageNum} / {pdf?.numPages ?? '?'}</div>
@@ -470,6 +484,7 @@ export default function PdfPractice() {
                   )}
                 </div>
               )}
+              {/* Debug info - commented out
               <div className="mt-2 text-xs opacity-60">Detected: [{pageQuestionNums.join(', ')}]</div>
               <div className="mt-2 text-xs opacity-60">Current: Question {currentNum} of {pageQuestions.length}</div>
               <div className="mt-2 text-xs opacity-60">Subject: {subject}</div>
@@ -486,6 +501,7 @@ export default function PdfPractice() {
                   <div>Choices: {current.choices.length}</div>
                 </div>
               )}
+              */}
             </div>
             
             {/* Navigation for pages with no questions (like reading passage pages) */}
@@ -512,7 +528,7 @@ export default function PdfPractice() {
                       onClick={() => {
                         if (pdf && pageNum < pdf.numPages) {
                           const nextPage = Math.min(pdf.numPages, pageNum + 1)
-                          console.log(`READING DEBUG: Manual navigation from page ${pageNum} to page ${nextPage}`)
+                          // console.log(`READING DEBUG: Manual navigation from page ${pageNum} to page ${nextPage}`)
                           setLastManualAdvance(nextPage)
                           setPageNum(nextPage)
                         }
@@ -634,7 +650,7 @@ export default function PdfPractice() {
                         
                         // Debug completion status for reading
                         if (subject === 'reading') {
-                          console.log(`Reading completion check: currentNum=${currentNum}, isLastQuestion=${isLastQuestion}`)
+                          // console.log(`Reading completion check: currentNum=${currentNum}, isLastQuestion=${isLastQuestion}`)
                         }
                         
                         // Check if we're on a page with "END OF TEST" text
@@ -677,7 +693,7 @@ export default function PdfPractice() {
                         
                         // Debug button text for reading
                         if (subject === 'reading') {
-                          console.log(`Reading button text check: qIdx=${qIdx}, pageQuestions.length=${pageQuestions.length}, allAnswered=${allAnswered}, isLastQuestion=${isLastQuestion}, hasEndOfTest=${hasEndOfTest}`)
+                          // console.log(`Reading button text check: qIdx=${qIdx}, pageQuestions.length=${pageQuestions.length}, allAnswered=${allAnswered}, isLastQuestion=${isLastQuestion}, hasEndOfTest=${hasEndOfTest}`)
                         }
                         
                         if (qIdx >= pageQuestions.length - 1 && allAnswered && (isLastQuestion || hasEndOfTest)) {
@@ -691,6 +707,7 @@ export default function PdfPractice() {
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   )

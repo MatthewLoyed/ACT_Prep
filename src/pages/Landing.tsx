@@ -7,6 +7,8 @@ const features = [
   { title: 'Real questions', desc: 'Practice with recent ACT-style questions.', icon: '📝' },
   { title: 'Smart timer', desc: 'Custom countdown with a friendly time’s-up cue.', icon: '⏱️' },
   { title: 'Smooth animations', desc: 'Microinteractions that keep you focused.', icon: '✨' },
+  { title: 'PDF Integration', desc: 'Upload real ACT tests and practice with authentic questions.', icon: '📄' },
+  { title: 'Progress tracking', desc: 'Monitor your improvement across all sections.', icon: '📊' },
 ]
 
 const faqs = [
@@ -17,57 +19,127 @@ const faqs = [
 
 export default function Landing() {
   return (
-    <div className="py-10">
+    <div className="py-16">
       {/* Hero */}
       <div className="container grid place-items-center">
-        <div className="max-w-3xl text-center">
+        <div className="max-w-4xl text-center">
           <motion.h1
-            className="text-4xl md:text-6xl font-extrabold tracking-tight"
-            initial={{ opacity: 0, y: 10 }}
+            className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-sky-600 via-purple-600 to-emerald-600 bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
             ACT prep that feels fun
           </motion.h1>
           <motion.p
-            className="mt-4 text-lg text-slate-600 dark:text-slate-300"
+            className="mt-6 text-xl text-slate-600 dark:text-slate-300 leading-relaxed"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
           >
             Skip the stale PDFs. Practice one question at a time with lively feedback, a clean UI, and smooth microanimations.
           </motion.p>
-          <motion.div className="mt-8 flex items-center justify-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-            <Link to="/subjects" className="btn btn-primary text-lg px-6 py-3">Start practicing</Link>
-            <a href="#features" className="btn btn-ghost text-lg px-6 py-3">See features</a>
+          <motion.div 
+            className="mt-10 flex items-center justify-center gap-4" 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ delay: 0.3, duration: 0.5 }}
+          >
+            <Link to="/import" className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+              Import A Test & Start Practicing!
+            </Link>
+            <a href="#features" className="btn btn-ghost text-lg px-6 py-3 hover:bg-slate-100 dark:hover:bg-slate-800">
+              See features
+            </a>
           </motion.div>
         </div>
       </div>
 
       {/* Features */}
-      <div id="features" className="container mt-16 grid gap-4 md:grid-cols-2">
-        {features.map((f, i) => (
-          <motion.div key={f.title} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ delay: i * 0.05 }} className="card p-5">
-            <div className="flex items-start gap-3">
-              <div className="text-2xl">{f.icon}</div>
-              <div>
-                <h3 className="font-semibold text-lg">{f.title}</h3>
-                <p className="text-slate-600 dark:text-slate-300">{f.desc}</p>
+      <div id="features" className="container mt-20">
+        <motion.h2 
+          className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          Why Choose Our ACT Prep?
+        </motion.h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {features.map((f, i) => (
+            <motion.div 
+              key={f.title} 
+              initial={{ opacity: 0, y: 20 }} 
+              whileInView={{ opacity: 1, y: 0 }} 
+              viewport={{ once: true, amount: 0.3 }} 
+              transition={{ delay: i * 0.1, duration: 0.5 }} 
+              className="card p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl p-2 rounded-xl bg-gradient-to-br from-sky-100 to-purple-100 dark:from-sky-900 dark:to-purple-900">
+                  {f.icon}
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2">{f.title}</h3>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{f.desc}</p>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       {/* Why better */}
-      <div className="container mt-16 card p-6">
-        <h3 className="text-2xl font-semibold">Why this is better than “just taking a test”</h3>
-        <ul className="mt-3 space-y-2 list-disc list-inside text-slate-700 dark:text-slate-300">
-          <li>Chunk your practice into quick wins instead of long, exhausting sessions.</li>
-          <li>Instant feedback reinforces learning and keeps motivation high.</li>
-          <li>Microanimations and sounds make it feel rewarding, not stressful.</li>
-          <li>Light/dark themes and a distraction-free layout help you focus.</li>
-        </ul>
+      <div className="container mt-20">
+        <motion.div 
+          className="card p-8 bg-gradient-to-br from-sky-50 to-purple-50 dark:from-sky-950 dark:to-purple-950 border border-sky-200 dark:border-sky-800"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-4">🚀</div>
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent">
+              Why This Beats Traditional Test Prep
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">⚡</div>
+                <div>
+                  <h4 className="font-semibold text-lg">Quick Wins</h4>
+                  <p className="text-slate-600 dark:text-slate-300">Chunk your practice into bite-sized sessions instead of exhausting marathons.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🎯</div>
+                <div>
+                  <h4 className="font-semibold text-lg">Instant Feedback</h4>
+                  <p className="text-slate-600 dark:text-slate-300">Learn from mistakes immediately and stay motivated with real-time results.</p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">✨</div>
+                <div>
+                  <h4 className="font-semibold text-lg">Engaging Experience</h4>
+                  <p className="text-slate-600 dark:text-slate-300">Smooth animations and sounds make learning feel rewarding, not stressful.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🎨</div>
+                <div>
+                  <h4 className="font-semibold text-lg">Distraction-Free</h4>
+                  <p className="text-slate-600 dark:text-slate-300">Clean design with light/dark themes helps you focus on what matters.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* FAQs */}
