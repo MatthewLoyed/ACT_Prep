@@ -382,7 +382,7 @@ export default function PdfPractice() {
       // Fix fractions: "6 _ 5" → "6/5"
       .replace(/(\d+)\s*_\s*(\d+)/g, '$1/$2')
       // Fix exponents: "t 2" → "t^2" (only for standalone letters, not words)
-      .replace(/(?<=\s|^)([a-zA-Z])\s+(\d+)(?=\s|$|[^\w])/g, (match, letter, num) => {
+      .replace(/(?<=\s|^)([a-zA-Z])\s+(\d+)(?=\s|$|[^\w])/g, (_, letter, num) => {
         // Don't add ^ if the letter is part of a word (like "at", "a", "an", "the")
         const commonWords = ['at', 'a', 'an', 'the', 'in', 'on', 'of', 'to', 'by', 'for', 'with', 'from']
         if (commonWords.includes(letter.toLowerCase())) {
@@ -542,7 +542,7 @@ export default function PdfPractice() {
                   {cleanMathText(current.prompt)}
                 </div>
                 <div className="space-y-2">
-                  {current.choices.map((choice, i) => {
+                  {current.choices.map((_, i) => {
                     // Determine the state for each choice
                     let state = ''
                     const userAnswered = answers[current.id] !== undefined

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getActiveTest } from '../lib/testStore'
+import type { SectionId } from '../lib/testStore'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type Question = {
@@ -33,8 +34,8 @@ export default function Quiz() {
   useEffect(() => {
     if (!subject) return
     const active = getActiveTest()
-    if (active && active.sections[subject as any]) {
-      setQuestions(active.sections[subject as any] as Question[])
+    if (active && active.sections[subject as SectionId]) {
+      setQuestions(active.sections[subject as SectionId] as Question[])
       return
     }
     fetch(`/questions/${subject}.json`).then(r => r.json()).then((data: Question[]) => setQuestions(data)).catch(() => setQuestions([]))

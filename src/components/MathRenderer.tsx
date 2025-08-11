@@ -49,7 +49,7 @@ export default function MathRenderer({ content, className = '' }: MathRendererPr
       // Handle matrices (simple 2x2 format)
       processedContent = processedContent.replace(
         /\[([^\[\]]+)\]/g,
-        (match, content) => {
+        (_, content) => {
           const rows = content.split(';').map((row: string) => 
             row.trim().split(',').map((cell: string) => cell.trim()).join(' & ')
           ).join(' \\\\ ')

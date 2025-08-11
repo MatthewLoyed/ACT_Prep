@@ -134,7 +134,7 @@ export default function ImportTest() {
         console.log(`    Has Answer: ${hasAnswer}`)
         console.log(`    Is Loaded: ${isLoaded}`)
         console.log(`    Prompt: "${q.prompt}"`)
-        console.log(`    Choices: [${q.choices.map((c, i) => `"${c}"`).join(', ')}]`)
+        console.log(`    Choices: [${q.choices.map((c) => `"${c}"`).join(', ')}]`)
         console.log(`    Choice Letters: [${q.choiceLetters?.join(', ') || 'none'}]`)
         console.log(`    Answer Index: ${q.answerIndex !== undefined ? q.answerIndex : 'none'}`)
         console.log(`    ---`)
