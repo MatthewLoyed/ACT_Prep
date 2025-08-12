@@ -11,7 +11,7 @@ const subjects = [
 export default function PdfPracticeSetup() {
   const navigate = useNavigate()
   const [subject, setSubject] = useState('english')
-  const [url, setUrl] = useState('/practice_tests/Preparing-for-the-ACT.pdf')
+  const [url, setUrl] = useState('')
 
   return (
     <div className="max-w-2xl mx-auto">

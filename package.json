@@ -1,5 +1,5 @@
 {
-  "name": "ai-act-prep",
+  "name": "testprep-pro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.54.0",
     "framer-motion": "^12.23.12",
     "mathjax": "^4.0.0",
     "pdfjs-dist": "^5.4.54",

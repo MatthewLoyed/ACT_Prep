@@ -1,10 +1,12 @@
-export type SectionId = 'english' | 'math' | 'reading' | 'science'
+// Define types locally to avoid module resolution issues
+type SectionId = 'english' | 'math' | 'reading' | 'science'
 
-export type TestBundle = {
+type TestBundle = {
   id: string
   name: string
   createdAt: string
   sections: Partial<Record<SectionId, any[]>>
+  pdfData?: string // Base64 encoded PDF data
 }
 
 const TESTS_KEY = 'tests'
@@ -21,10 +23,55 @@ export function listTests(): TestBundle[] {
 export function saveTest(bundle: Omit<TestBundle, 'id' | 'createdAt'>): TestBundle {
   const tests = listTests()
   const id = cryptoRandomId()
-  const full: TestBundle = { id, name: bundle.name, sections: bundle.sections, createdAt: new Date().toISOString() }
+  const full: TestBundle = { 
+    id, 
+    name: bundle.name, 
+    sections: bundle.sections, 
+    pdfData: bundle.pdfData,
+    createdAt: new Date().toISOString() 
+  }
+  
+  console.log('TESTSTORE DEBUG: Saving test with ID:', id)
+  console.log('TESTSTORE DEBUG: Test has PDF data:', !!full.pdfData)
+  console.log('TESTSTORE DEBUG: PDF data length:', full.pdfData?.length || 0)
+  
   tests.push(full)
-  localStorage.setItem(TESTS_KEY, JSON.stringify(tests))
-  return full
+  
+  try {
+    localStorage.setItem(TESTS_KEY, JSON.stringify(tests))
+    console.log('TESTSTORE DEBUG: Test saved successfully')
+    return full
+  } catch (error) {
+    console.error('TESTSTORE DEBUG: Storage quota exceeded, attempting to free space...')
+    
+    // Try to free space by removing old tests
+    if (tests.length > 1) {
+      // Remove the oldest test (excluding the one we're trying to save)
+      const sortedTests = tests.slice(0, -1).sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
+      
+      if (sortedTests.length > 0) {
+        const oldestTest = sortedTests[0]
+        console.log(`TESTSTORE DEBUG: Removing oldest test: ${oldestTest.name} (${oldestTest.createdAt})`)
+        
+        // Remove the oldest test and try again
+        const filteredTests = tests.filter(t => t.id !== oldestTest.id)
+        filteredTests.push(full)
+        
+        try {
+          localStorage.setItem(TESTS_KEY, JSON.stringify(filteredTests))
+          console.log('TESTSTORE DEBUG: Test saved after removing oldest test')
+          return full
+        } catch (secondError) {
+          console.error('TESTSTORE DEBUG: Still quota exceeded after removing oldest test')
+          throw new Error('Storage quota exceeded. Please clear some tests manually.')
+        }
+      }
+    }
+    
+    throw new Error('Storage quota exceeded. Please clear some tests manually.')
+  }
 }
 
 export function getActiveTestId(): string | null {
@@ -65,6 +112,38 @@ export function cryptoRandomId(): string {
 export function clearTests(): void {
   localStorage.removeItem(TESTS_KEY)
   localStorage.removeItem(ACTIVE_TEST_KEY)
+}
+
+export function deleteTest(id: string): void {
+  const tests = listTests()
+  const filteredTests = tests.filter(t => t.id !== id)
+  localStorage.setItem(TESTS_KEY, JSON.stringify(filteredTests))
+  
+  // If the deleted test was the active test, clear the active test
+  const activeTestId = getActiveTestId()
+  if (activeTestId === id) {
+    setActiveTestId(null)
+  }
+}
+
+export function getStorageInfo(): { used: number; total: number; tests: number } {
+  const tests = listTests()
+  let totalSize = 0
+  
+  // Calculate size of all tests
+  tests.forEach(test => {
+    const testSize = JSON.stringify(test).length
+    totalSize += testSize
+  })
+  
+  // Estimate total storage (rough calculation)
+  const totalStorage = 5 * 1024 * 1024 // 5MB typical localStorage limit
+  
+  return {
+    used: totalSize,
+    total: totalStorage,
+    tests: tests.length
+  }
 }
 
 

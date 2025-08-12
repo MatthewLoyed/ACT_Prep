@@ -1,20 +1,42 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { listTests, setActiveTestId } from '../lib/testStore'
+import { listTestsFromSupabase, setActiveTestId, deleteTestFromSupabase, clearAllTestsFromSupabase } from '../lib/supabaseTestStore'
+
+// Define the test type locally
+type Test = {
+  id: string
+  name: string
+  createdAt: string
+  sections: Record<string, unknown[]>
+  pdfData?: string
+}
 
 export default function Practice() {
   const navigate = useNavigate()
-  const [tests, setTests] = useState(() => listTests())
+  const [tests, setTests] = useState<Test[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null)
 
   useEffect(() => {
-    setTests(listTests())
+    loadTests()
   }, [])
+
+  const loadTests = async () => {
+    try {
+      setLoading(true)
+      const testsList = await listTestsFromSupabase()
+      setTests(testsList as Test[])
+    } catch (error) {
+      console.error('Failed to load tests:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleTestSelect = (testId: string) => {
     setSelectedTestId(testId)
-    setActiveTestId(testId as any)
+    setActiveTestId(testId)
   }
 
   const handleStartTest = () => {
@@ -34,7 +56,15 @@ export default function Practice() {
         </p>
       </div>
 
-      {tests.length === 0 ? (
+      {loading ? (
+        <div className="text-center">
+          <div className="card p-12 max-w-lg mx-auto">
+            <div className="text-4xl mb-4">⏳</div>
+            <h3 className="text-xl font-semibold mb-2">Loading tests...</h3>
+            <p className="text-slate-600 dark:text-slate-400">Please wait while we fetch your tests.</p>
+          </div>
+        </div>
+      ) : tests.length === 0 ? (
         <div className="text-center">
           <div className="card p-12 max-w-lg mx-auto">
             <div className="text-8xl mb-6">📚</div>
@@ -75,14 +105,14 @@ export default function Practice() {
                         {new Date(test.createdAt).toLocaleString()}
                       </div>
                       <div className="flex gap-2 mt-1">
-                        {Object.entries(test.sections).map(([section, questions]) => (
-                          <span 
-                            key={section}
-                            className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs"
-                          >
-                            {section}: {(questions as any[]).length}
-                          </span>
-                        ))}
+                                                 {Object.entries(test.sections).map(([section, questions]) => (
+                           <span 
+                             key={section}
+                             className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs"
+                           >
+                             {section}: {(questions as unknown[]).length}
+                           </span>
+                         ))}
                       </div>
                     </div>
                   </div>
@@ -91,13 +121,21 @@ export default function Practice() {
                        <div className="text-sky-500 font-semibold">✓ Selected</div>
                                                <button 
                           className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (confirm('Are you sure you want to delete this test?')) {
-                              // TODO: Add delete functionality
-                              console.log('Delete test:', test.id)
-                            }
-                          }}
+                                                     onClick={async (e) => {
+                             e.stopPropagation()
+                             if (confirm('Are you sure you want to delete this test? This action cannot be undone.')) {
+                               try {
+                                 await deleteTestFromSupabase(test.id)
+                                 await loadTests() // Reload the tests list
+                                 if (selectedTestId === test.id) {
+                                   setSelectedTestId(null)
+                                 }
+                               } catch (error) {
+                                 console.error('Failed to delete test:', error)
+                                 alert('Failed to delete test. Please try again.')
+                               }
+                             }
+                           }}
                         >
                           🗑️ Delete
                         </button>
@@ -108,33 +146,40 @@ export default function Practice() {
             </motion.div>
           ))}
 
-          {selectedTestId && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 text-center"
-            >
-                             <div className="flex items-center justify-center gap-4">
-                 <button
-                   className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                   onClick={handleStartTest}
-                 >
-                   Start Test →
-                 </button>
-                 <button
-                   className="btn btn-ghost btn-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                   onClick={() => {
-                     if (confirm('Are you sure you want to clear all tests?')) {
-                       // TODO: Add clear all functionality
-                       console.log('Clear all tests')
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 text-center"
+          >
+            <div className="flex items-center justify-center gap-4">
+              {selectedTestId && (
+                <button
+                  className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  onClick={handleStartTest}
+                >
+                  Start Test →
+                </button>
+              )}
+                             <button
+                 className="btn btn-ghost btn-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                 onClick={async () => {
+                   if (confirm('Are you sure you want to clear all tests? This action cannot be undone.')) {
+                     try {
+                       await clearAllTestsFromSupabase()
+                       setTests([])
+                       setSelectedTestId(null)
+                       console.log('All tests cleared successfully from database')
+                     } catch (error) {
+                       console.error('Failed to clear all tests:', error)
+                       alert('Failed to clear all tests. Please try again.')
                      }
-                   }}
-                 >
-                   Clear All Tests
-                 </button>
-               </div>
-            </motion.div>
-          )}
+                   }
+                 }}
+               >
+                 Clear All Tests
+               </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

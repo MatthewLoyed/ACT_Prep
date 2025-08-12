@@ -1,69 +1,34 @@
-# React + TypeScript + Vite
+# TestPrep Pro
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, interactive test preparation application for college entrance exams. Upload your ACT® practice test PDFs and practice with instant feedback, smooth animations, and progress tracking.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 📄 **PDF Import**: Upload ACT® practice test PDFs and automatically extract questions
+- ✅ **Instant Feedback**: Get immediate results with audio and visual feedback
+- 📊 **Progress Tracking**: Monitor your improvement across all sections
+- 🎯 **Section Practice**: Focus on specific subjects (English, Math, Reading)
+- ⏱️ **Smart Timer**: Custom countdown with friendly time's-up cues
+- ✨ **Smooth Animations**: Engaging microinteractions that keep you focused
+- 🌙 **Dark/Light Mode**: Clean design with theme switching
+- 📱 **Responsive**: Works perfectly on desktop and mobile devices
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend**: React 19 + TypeScript + Vite
+- **Styling**: Tailwind CSS
+- **Animations**: Framer Motion
+- **PDF Processing**: PDF.js
+- **Routing**: React Router DOM
+- **Math Rendering**: MathJax
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start development server: `npm run dev`
+4. Build for production: `npm run build`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Legal Notice
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+ACT® is a registered trademark of ACT, Inc. This application is not affiliated with or endorsed by ACT, Inc. Users are responsible for ensuring they have the right to use any practice materials they upload.

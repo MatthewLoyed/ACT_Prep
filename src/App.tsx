@@ -69,7 +69,7 @@ function App() {
           <div className="max-w-7xl mx-auto px-9 py-5 flex items-center justify-between">
             <Link to="/" className="group">
               <span className="text-5xl font-black bg-gradient-to-r from-sky-600 via-purple-600 to-emerald-600 bg-clip-text text-transparent tracking-tight hover:scale-105 transition-transform duration-200">
-                ACT PREP
+                TestPrep Pro
               </span>
             </Link>
             <div className="flex items-center flex-1 justify-end">

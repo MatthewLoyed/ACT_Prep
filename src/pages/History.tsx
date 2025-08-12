@@ -70,7 +70,7 @@ export default function History() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Overall ACT (est.)</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">Overall ACT® (est.)</div>
           <div className="text-4xl font-bold">{overallAct} / 36</div>
         </div>
         <div className="card p-5">
@@ -98,7 +98,7 @@ export default function History() {
           <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800/70 overflow-hidden">
             <div className="h-full brand-gradient" style={{ width: `${Math.min(100, (overallAct / goal) * 100)}%` }} />
           </div>
-          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Estimated ACT vs goal</div>
+          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Estimated ACT® vs goal</div>
         </div>
       </div>
 

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
-import { getActiveTest } from '../lib/testStore'
-import type { SectionId } from '../lib/testStore'
+import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+
+// Define types locally
+type SectionId = 'english' | 'math' | 'reading' | 'science'
 import { AnimatePresence, motion } from 'framer-motion'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
@@ -21,11 +23,12 @@ type Question = {
 }
 
 export default function PdfPractice() {
+  const navigate = useNavigate()
   const { subject = 'english' } = useParams()
   const [params] = useSearchParams()
-  const pdfUrl = params.get('url') || '/practice_tests/Preparing-for-the-ACT.pdf'
+  const testId = params.get('testId') || ''
 
-  // console.log(`PdfPractice: Current subject = ${subject}`)
+  // console.log(`PdfPractice: Current subject = ${subject}, testId = ${testId}`)
 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [pageNum, setPageNum] = useState<number>(1)
@@ -33,14 +36,57 @@ export default function PdfPractice() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const leftPaneRef = useRef<HTMLDivElement | null>(null)
 
-  const active = getActiveTest()
+  const [active, setActive] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Load test from Supabase
+  useEffect(() => {
+    const loadTest = async () => {
+      if (!testId) {
+        setActive(null)
+        setLoading(false)
+        return
+      }
+      
+      try {
+        setLoading(true)
+        // PDF debug removed
+        const loadedTest = await loadTestFromSupabase(testId)
+        console.log('PDF DEBUG: Test loaded:', loadedTest)
+        console.log('PDF DEBUG: Has PDF data:', !!loadedTest?.pdfData)
+        setActive(loadedTest)
+      } catch (error) {
+        console.error('PDF DEBUG: Failed to load test:', error)
+        setActive(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadTest()
+  }, [testId])
   const allQuestions: Question[] = useMemo(() => {
     const fallback: Question[] = []
     if (!subject) return fallback
     const fromActive = (active?.sections as Partial<Record<SectionId, unknown[]>> | undefined)?.[subject as SectionId] as
       | Question[]
       | undefined
-    return (fromActive ?? fallback)
+    
+    const questions = fromActive ?? fallback
+    
+    // Debug: Check if questions have answers
+    if (questions.length > 0) {
+      const questionsWithAnswers = questions.filter(q => q.answerIndex !== undefined)
+      console.log(`PRACTICE DEBUG: ${subject} section loaded ${questions.length} questions`)
+      console.log(`PRACTICE DEBUG: ${questionsWithAnswers.length} questions have answers`)
+      
+      // Show first few questions with their answers
+      questions.slice(0, 3).forEach((q, i) => {
+        console.log(`PRACTICE DEBUG: Question ${i + 1}: ID=${q.id}, Answer=${q.answerIndex}, Choices=${q.choices.length}`)
+      })
+    }
+    
+    return questions
   }, [active, subject])
 
   const [pageQuestionNums, setPageQuestionNums] = useState<number[]>([])
@@ -51,6 +97,7 @@ export default function PdfPractice() {
   const [qIdx, setQIdx] = useState<number>(0)
   const [testCompleted, setTestCompleted] = useState<boolean>(false)
   const [lastManualAdvance, setLastManualAdvance] = useState<number | null>(null)
+  const [isPageDetectionRunning, setIsPageDetectionRunning] = useState(false)
   const [currentPageText, setCurrentPageText] = useState<string>('')
 
   // Reset all state when subject changes to prevent data corruption
@@ -68,17 +115,68 @@ export default function PdfPractice() {
     setPageNum(1)
   }, [subject])
 
-  // Load PDF
+  // Load PDF from stored data
   useEffect(() => {
+    if (!testId || !active) {
+      setPdf(null)
+      return
+    }
+    
+          // PDF loading debug info removed to focus on page detection
+    
+    if (!active.pdfData) {
+      console.log('PDF DEBUG: No PDF data found in test')
+      setPdf(null)
+      return
+    }
+    
     let cancelled = false
-    getDocument(pdfUrl).promise.then(doc => { if (!cancelled) setPdf(doc) })
+    
+    try {
+      // Handle both data URL format and raw base64
+      let base64Data: string
+      if (active.pdfData.startsWith('data:')) {
+        // Data URL format: data:application/pdf;base64,<base64-data>
+        const arr = active.pdfData.split(',')
+        base64Data = arr[1]
+      } else {
+        // Raw base64 format
+        base64Data = active.pdfData
+      }
+      
+      // Base64 debug info removed to focus on page detection
+      
+      // Convert base64 back to array buffer
+      const binaryString = atob(base64Data)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      
+      // PDF conversion debug info removed to focus on page detection
+      
+      getDocument({ data: bytes.buffer }).promise.then(doc => { 
+        if (!cancelled) {
+          console.log('PDF DEBUG: PDF loaded successfully, pages:', doc.numPages)
+          setPdf(doc) 
+        }
+      }).catch(err => {
+        console.error('PDF DEBUG: Error loading PDF:', err)
+        setPdf(null)
+      })
+    } catch (err) {
+      console.error('PDF DEBUG: Error converting PDF data:', err)
+      setPdf(null)
+    }
+    
     return () => { cancelled = true }
-  }, [pdfUrl])
+  }, [testId, active?.pdfData])
 
   // Jump to first real question page on load
   useEffect(() => {
     if (!pdf) return
     let mounted = true
+    setIsPageDetectionRunning(true)
     ;(async () => {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
@@ -87,9 +185,11 @@ export default function PdfPractice() {
         const text = (content.items as PDFTextItem[]).map((it) => it.str).join('\n')
         
         // Check for section headers
-        const isEnglishSection = /ENGLISH TEST/i.test(text)
+        const isEnglishSection = /ENGLISH TEST\s+35\s+Minutes—50\s+Questions/i.test(text)
         const isMathSection = /MATHEMATICS TEST\s+50\s+Minutes—45\s+Questions/i.test(text)
         const isReadingSection = /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
+        
+        // Page detection debug removed - issue fixed
         
         if ((isEnglishSection || isMathSection || isReadingSection) && subject) {
           const sectionMatch = 
@@ -97,27 +197,42 @@ export default function PdfPractice() {
             (isMathSection && subject === 'math') ||
             (isReadingSection && subject === 'reading')
           
+          // Section match debug removed - issue fixed
+          
           if (sectionMatch) {
             // For reading, start on the section header page (even if no questions)
             if (subject === 'reading') {
-              // console.log(`READING TEST section found on page ${i} - setting as starting page`)
-              // console.log(`READING DEBUG: Page ${i} text preview: "${text.substring(0, 200)}..."`)
-              if (mounted) setPageNum(i)
+              // Reading page detection debug removed - issue fixed
+              if (mounted) {
+                setPageNum(i)
+                // Set a flag to prevent auto-skip from overriding this page
+                setLastManualAdvance(i)
+              }
               break
             } else {
               // For other sections, look for actual questions with answer choices
               const hasQuestions = /\d{1,2}[.)]\s+[^]*?[A-DFGHJ][.)]\s+/.test(text)
+              
               if (hasQuestions) {
-                // console.log(`${subject.toUpperCase()} section found on page ${i} - setting as starting page`)
-                if (mounted) setPageNum(i)
+                // Section page detection debug removed - issue fixed
+                if (mounted) {
+                  setPageNum(i)
+                  // Set a flag to prevent auto-skip from overriding this page
+                  setLastManualAdvance(i)
+                }
                 break
+              } else {
+                // No questions debug removed - issue fixed
               }
             }
           }
         }
       }
     })()
-    return () => { mounted = false }
+    return () => { 
+      mounted = false 
+      setIsPageDetectionRunning(false)
+    }
   }, [pdf, subject])
 
   // Render page
@@ -198,19 +313,24 @@ export default function PdfPractice() {
       setPageQuestionNums(uniqueNums)
       
       // Auto-skip pages with no questions, but allow reading test start page
-      if (uniqueNums.length === 0 && pdf && pageNum < pdf.numPages && lastAutoSkip !== pageNum && lastManualAdvance !== pageNum) {
-        // Special case: don't auto-skip reading test start page even if no questions
-        const isReadingTestStart = subject === 'reading' && /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
-        
-        if (!isReadingTestStart) {
-          // console.log(`Auto-skipping page ${pageNum} (no questions detected)`)
-          setLastAutoSkip(pageNum)
-          setTimeout(() => setPageNum(p => Math.min(pdf.numPages, p + 1)), 0)
-          return
-        } else {
-          // console.log(`READING DEBUG: Staying on reading test start page ${pageNum} (no questions but test start detected)`)
+      // Add a small delay to allow state updates from page detection to take effect
+      setTimeout(() => {
+        if (uniqueNums.length === 0 && pdf && pageNum < pdf.numPages && lastAutoSkip !== pageNum && lastManualAdvance !== pageNum && !isPageDetectionRunning) {
+          // Special case: don't auto-skip reading test start page even if no questions
+          const isReadingTestStart = subject === 'reading' && /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
+          
+          // Auto-skip debug removed - issue fixed
+          
+          if (!isReadingTestStart) {
+            // Auto-skip action debug removed - issue fixed
+            setLastAutoSkip(pageNum)
+            setTimeout(() => setPageNum(p => Math.min(pdf.numPages, p + 1)), 0)
+            return
+          } else {
+            // Reading test start debug removed - issue fixed
+          }
         }
-      }
+      }, 50) // Small delay to allow state updates to take effect
 
       // Check for test ending - allow completion of questions on the final page
       const hasEndOfTest = 
@@ -223,7 +343,7 @@ export default function PdfPractice() {
         // console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${uniqueNums.join(', ')}]`)
       }
 
-      // console.log(`Rendering page ${pageNum}, detected questions: [${uniqueNums.join(', ')}]`)
+      // Render debug removed - issue fixed
       
       // Clear manual advance flag after a delay to allow auto-skip on subsequent pages
       if (lastManualAdvance === pageNum) {
@@ -286,7 +406,7 @@ export default function PdfPractice() {
         })
       }
     }
-    // For Reading, pre-create slots 1-36 (ACT reading has 36 questions)
+                // For Reading, pre-create slots 1-36 (ACT® reading has 36 questions)
     else if (subject === 'reading') {
       for (let i = 1; i <= 36; i++) {
         questionSlots.set(i, {
@@ -419,20 +539,65 @@ export default function PdfPractice() {
   return (
     <div className="h-dvh flex flex-col">
       {/* Test Title Bar */}
-      <div className="bg-gradient-to-r from-sky-600 to-purple-600 text-white p-4 text-center">
-        <h1 className="text-3xl font-bold tracking-wide">
-          {subject?.toUpperCase()} TEST
-        </h1>
-        <p className="text-sky-100 mt-1">
-          {subject === 'english' && '35 Minutes — 50 Questions'}
-          {subject === 'math' && '50 Minutes — 45 Questions'}
-          {subject === 'reading' && '40 Minutes — 36 Questions'}
-          {subject === 'science' && '40 Minutes — 40 Questions'}
-        </p>
+      <div className="bg-gradient-to-r from-sky-600 to-purple-600 text-white p-4">
+        <div className="flex items-center justify-between">
+          <button 
+            className="btn btn-ghost text-white hover:bg-white/20 border-white/20"
+            onClick={() => navigate(`/test-selection/${testId}`)}
+          >
+            ← Back to Subjects
+          </button>
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold tracking-wide">
+              {subject?.toUpperCase()} TEST
+            </h1>
+            <p className="text-sky-100 mt-1">
+              {subject === 'english' && '35 Minutes — 50 Questions'}
+              {subject === 'math' && '50 Minutes — 45 Questions'}
+              {subject === 'reading' && '40 Minutes — 36 Questions'}
+              {subject === 'science' && '40 Minutes — 40 Questions'}
+            </p>
+          </div>
+          <div className="w-24"></div> {/* Spacer to center the title */}
+        </div>
       </div>
       
       <div className="flex-1 grid lg:grid-cols-[3fr_1fr] gap-4 p-4">
-      <div ref={leftPaneRef} className="card p-2 overflow-auto">
+        {loading ? (
+          <div className="col-span-2 card p-8 text-center">
+            <div className="text-4xl mb-4">⏳</div>
+            <h2 className="text-2xl font-bold mb-4">Loading Test...</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              Please wait while we load your test from the database.
+            </p>
+          </div>
+        ) : !pdf ? (
+          <div className="col-span-2 card p-8 text-center">
+            <div className="text-6xl mb-4">📄</div>
+            <h2 className="text-2xl font-bold mb-4">No PDF Available</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              {!testId ? 'No test selected. Please select a test first.' : 
+               !active?.pdfData ? 'This test does not have PDF data. Please re-import the test.' :
+               'Loading PDF... Please wait.'}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button 
+                className="btn btn-ghost"
+                onClick={() => navigate(`/test-selection/${testId}`)}
+              >
+                ← Back to Subjects
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => navigate('/practice')}
+              >
+                Back to Test Selection
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div ref={leftPaneRef} className="card p-2 overflow-auto">
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="text-sm">Page {pageNum} / {pdf?.numPages ?? '?'}</div>
           <div className="flex items-center gap-2">
@@ -464,12 +629,20 @@ export default function PdfPractice() {
             <div className="text-slate-600 dark:text-slate-400">
               You have completed the {subject.toUpperCase()} test.
             </div>
-            <button 
-              className="btn btn-primary mt-4"
-              onClick={() => window.history.back()}
-            >
-              Back to Test Selection
-            </button>
+            <div className="flex gap-3 justify-center mt-4">
+              <button 
+                className="btn btn-ghost"
+                onClick={() => navigate(`/test-selection/${testId}`)}
+              >
+                ← Back to Subjects
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => navigate('/practice')}
+              >
+                Back to Test Selection
+              </button>
+            </div>
           </div>
                 ) : (
           <>
@@ -708,6 +881,8 @@ export default function PdfPractice() {
           </>
         )}
       </div>
+      </>
+        )}
       </div>
     </div>
   )

@@ -1,24 +1,39 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listTests, setActiveTestId, getActiveTestId, clearTests } from '../lib/testStore'
+import { listTestsFromSupabase, setActiveTestId, getActiveTestId, clearAllTestsFromSupabase } from '../lib/supabaseTestStore'
 
 export default function ChooseTest() {
   const navigate = useNavigate()
-  const [tests, setTests] = useState(() => listTests())
+  const [tests, setTests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [active, setActive] = useState<string | null>(() => getActiveTestId())
 
   useEffect(() => {
-    setTests(listTests())
+    loadTests()
   }, [])
+
+  const loadTests = async () => {
+    try {
+      setLoading(true)
+      const testsList = await listTestsFromSupabase()
+      setTests(testsList)
+    } catch (error) {
+      console.error('Failed to load tests:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-semibold mb-2">Choose a test</h2>
       <p className="text-slate-600 dark:text-slate-300 mb-4">Select which imported test to use for practice.</p>
       <div className="space-y-3">
-        {tests.length === 0 && (
+        {loading ? (
+          <div className="card p-4">Loading tests...</div>
+        ) : tests.length === 0 ? (
           <div className="card p-4">No imported tests yet. Go to Import to add one.</div>
-        )}
+        ) : null}
         {tests.map(t => (
           <div key={t.id} className="card p-4 w-full flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -51,11 +66,17 @@ export default function ChooseTest() {
       <div className="mt-6 flex justify-end">
         <button
           className="btn btn-ghost"
-          onClick={() => {
+          onClick={async () => {
             if (confirm('Clear all saved tests? This cannot be undone.')) {
-              clearTests()
-              setActive(null)
-              setTests([])
+              try {
+                await clearAllTestsFromSupabase()
+                setActive(null)
+                setTests([])
+                console.log('All tests cleared successfully from database')
+              } catch (error) {
+                console.error('Failed to clear all tests:', error)
+                alert('Failed to clear all tests. Please try again.')
+              }
             }
           }}
         >

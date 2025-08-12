@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { getTest } from '../lib/testStore'
+import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+import { useEffect, useState } from 'react'
 
 const subjects = [
   { 
@@ -46,8 +47,35 @@ const subjects = [
 export default function TestSelection() {
   const { testId } = useParams()
   const navigate = useNavigate()
+  const [test, setTest] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   
-  const test = testId ? getTest(testId) : null
+  useEffect(() => {
+    if (testId) {
+      loadTest()
+    }
+  }, [testId])
+  
+  const loadTest = async () => {
+    try {
+      setLoading(true)
+      const loadedTest = await loadTestFromSupabase(testId!)
+      setTest(loadedTest)
+    } catch (error) {
+      console.error('Failed to load test:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto text-center">
+        <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
+        <p className="text-slate-600 dark:text-slate-400 mb-4">Please wait while we load your test.</p>
+      </div>
+    )
+  }
   
   if (!test) {
     return (
@@ -73,8 +101,8 @@ export default function TestSelection() {
       return
     }
     
-    // Navigate to PDF practice for this subject
-    navigate(`/pdf-practice/${subjectId}`)
+    // Navigate to PDF practice for this subject with testId
+    navigate(`/pdf-practice/${subjectId}?testId=${testId}`)
   }
 
   return (

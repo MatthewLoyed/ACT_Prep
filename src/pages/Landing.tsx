@@ -4,16 +4,16 @@ import { motion } from 'framer-motion'
 
 const features = [
   { title: 'Instant feedback', desc: 'Hear and see if you’re right, immediately.', icon: '✅' },
-  { title: 'Real questions', desc: 'Practice with recent ACT-style questions.', icon: '📝' },
+  { title: 'Real questions', desc: 'Practice with recent ACT®-style questions.', icon: '📝' },
   { title: 'Smart timer', desc: 'Custom countdown with a friendly time’s-up cue.', icon: '⏱️' },
   { title: 'Smooth animations', desc: 'Microinteractions that keep you focused.', icon: '✨' },
-  { title: 'PDF Integration', desc: 'Upload real ACT tests and practice with authentic questions.', icon: '📄' },
+  { title: 'PDF Integration', desc: 'Upload real ACT® tests and practice with authentic questions.', icon: '📄' },
   { title: 'Progress tracking', desc: 'Monitor your improvement across all sections.', icon: '📊' },
 ]
 
 const faqs = [
   { q: 'Is this free?', a: 'Yes. Your practice data stays in your browser.' },
-  { q: 'Where do questions come from?', a: 'Sampled from recent ACT-style practice material (JSON for now, API-ready later).' },
+  { q: 'Where do questions come from?', a: 'Sampled from recent ACT®-style practice material (JSON for now, API-ready later).' },
   { q: 'Can I practice on my phone?', a: 'Absolutely. The UI is fully responsive.' },
 ]
 
@@ -29,7 +29,7 @@ export default function Landing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            ACT prep that feels fun
+            ACT® prep that feels fun
           </motion.h1>
           <motion.p
             className="mt-6 text-xl text-slate-600 dark:text-slate-300 leading-relaxed"
@@ -64,7 +64,7 @@ export default function Landing() {
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          Why Choose Our ACT Prep?
+          Why Choose Our ACT® Prep?
         </motion.h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {features.map((f, i) => (
@@ -157,7 +157,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="mt-16 border-t border-slate-200 dark:border-slate-800">
         <div className="container py-6 text-sm text-slate-600 dark:text-slate-400 flex items-center justify-between">
-          <div>© 2025 ACT Prep — All rights reserved.</div>
+          <div>© 2025 TestPrep Pro — All rights reserved.</div>
           <div className="opacity-80">Made with React, Tailwind CSS, and Framer Motion.</div>
         </div>
       </footer>
