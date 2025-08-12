@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { listTestsFromSupabase } from '../lib/supabaseTestStore'
+import ProgressCircle from '../components/ProgressCircle'
 
 type SectionKey = 'english' | 'math' | 'reading' | 'science'
 
@@ -10,16 +12,38 @@ type Session = {
   durationSec: number
 }
 
+type Test = {
+  id: string
+  name: string
+  createdAt: string
+  sections: Record<string, any[]>
+}
+
 export default function History() {
   const [goal, setGoal] = useState<number>(() => Number(localStorage.getItem('goal36') ?? 28))
   const [sessions, setSessions] = useState<Session[]>([])
+  const [tests, setTests] = useState<Test[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
     try {
+      // Load sessions from localStorage (legacy data)
       const stored = JSON.parse(localStorage.getItem('sessions') ?? '[]') as Session[]
       setSessions(stored)
-    } catch {}
-  }, [])
+      
+      // Load tests from Supabase
+      const supabaseTests = await listTestsFromSupabase()
+      setTests(supabaseTests)
+    } catch (error) {
+      console.error('Error loading history data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     localStorage.setItem('goal36', String(goal))
@@ -62,24 +86,80 @@ export default function History() {
   const overallTotal = sessions.reduce((a, s) => a + s.total, 0)
   const overallAct = actScale(overallRaw, overallTotal)
   const overallTime = sessions.reduce((a, s) => a + s.durationSec, 0)
+  
+  // Calculate total questions from imported tests
+  const totalImportedQuestions = tests.reduce((sum, test) => {
+    return sum + Object.values(test.sections).reduce((sectionSum: number, section: any) => sectionSum + (section?.length || 0), 0)
+  }, 0)
 
   return (
     <div className="max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold mb-2">Progress & History</h2>
       <p className="text-slate-600 dark:text-slate-300 mb-6">Stay encouraged — progress compounds.</p>
 
-      <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="card p-5">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Overall ACT® (est.)</div>
+                <div className="text-4xl font-bold">{overallAct} / 36</div>
+              </div>
+              <div className="card p-5">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Questions practiced</div>
+                <div className="text-4xl font-bold">{overallTotal}</div>
+              </div>
+              <div className="card p-5">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Tests imported</div>
+                <div className="text-4xl font-bold">{tests.length}</div>
+              </div>
+              <div className="card p-5">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total questions available</div>
+                <div className="text-4xl font-bold">{totalImportedQuestions}</div>
+              </div>
+            </div>
+            
+            {/* Progress Circles */}
+            <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <div className="card p-6 text-center">
+                <ProgressCircle 
+                  progress={Math.min(100, (overallTotal / 200) * 100)} 
+                  size="md" 
+                  color="blue"
+                  label="Practice Progress"
+                />
+              </div>
+              <div className="card p-6 text-center">
+                <ProgressCircle 
+                  progress={Math.min(100, (tests.length / 10) * 100)} 
+                  size="md" 
+                  color="green"
+                  label="Test Collection"
+                />
+              </div>
+              <div className="card p-6 text-center">
+                <ProgressCircle 
+                  progress={Math.min(100, (overallAct / 36) * 100)} 
+                  size="md" 
+                  color="purple"
+                  label="ACT® Score"
+                />
+              </div>
+              <div className="card p-6 text-center">
+                <ProgressCircle 
+                  progress={Math.min(100, (sessions.length / 50) * 100)} 
+                  size="md" 
+                  color="orange"
+                  label="Study Sessions"
+                />
+              </div>
+            </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Overall ACT® (est.)</div>
-          <div className="text-4xl font-bold">{overallAct} / 36</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">Total practice time</div>
+          <div className="text-4xl font-bold">{Math.round(overallTime / 60)} min</div>
         </div>
         <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Questions practiced</div>
-          <div className="text-4xl font-bold">{overallTotal}</div>
-        </div>
-        <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Total minutes</div>
-          <div className="text-4xl font-bold">{Math.round(overallTime / 60)}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">Average per session</div>
+          <div className="text-4xl font-bold">{sessions.length > 0 ? Math.round(overallTime / sessions.length / 60) : 0} min</div>
         </div>
       </div>
 
@@ -120,10 +200,43 @@ export default function History() {
       </div>
 
       <div className="mt-8 card p-5">
+        <h3 className="text-xl font-semibold">Imported Tests</h3>
+        <div className="mt-2">
+          {loading ? (
+            <div className="py-4 text-slate-600 dark:text-slate-400">Loading tests...</div>
+          ) : tests.length === 0 ? (
+            <div className="py-4 text-slate-600 dark:text-slate-400">No tests imported yet. Import a test to get started!</div>
+          ) : (
+            <div className="space-y-3">
+              {tests.map((test) => {
+                const totalQuestions = Object.values(test.sections).reduce((sum: number, section: any) => sum + (section?.length || 0), 0)
+                const sections = Object.keys(test.sections).filter(key => test.sections[key]?.length > 0)
+                return (
+                  <div key={test.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold">{test.name}</h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {totalQuestions} questions • {sections.join(', ')} sections
+                        </p>
+                      </div>
+                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                        {new Date(test.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-8 card p-5">
         <h3 className="text-xl font-semibold">Recent sessions</h3>
         <div className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
           {sessions.length === 0 && (
-            <div className="py-4 text-slate-600 dark:text-slate-400">No practice yet. Start a subject or a full test — small steps build big results!</div>
+            <div className="py-4 text-slate-600 dark:text-slate-400">No practice sessions yet. Start a subject or a full test — small steps build big results!</div>
           )}
           {sessions.map((s, i) => (
             <div key={i} className="py-3 flex items-center justify-between text-sm">

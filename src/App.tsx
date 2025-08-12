@@ -59,7 +59,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-dvh bg-gradient-to-br from-white via-slate-25 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors">
+      <div className="min-h-dvh bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-950 dark:via-teal-950 dark:to-cyan-950 transition-colors">
         <motion.header 
           className="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 backdrop-blur-lg shadow-lg"
           initial={{ y: 0 }}
@@ -68,7 +68,7 @@ function App() {
         >
           <div className="max-w-7xl mx-auto px-9 py-5 flex items-center justify-between">
             <Link to="/" className="group">
-              <span className="text-5xl font-black bg-gradient-to-r from-sky-600 via-purple-600 to-emerald-600 bg-clip-text text-transparent tracking-tight hover:scale-105 transition-transform duration-200">
+              <span className="text-5xl font-black bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent tracking-tight hover:scale-105 transition-transform duration-200">
                 TestPrep Pro
               </span>
             </Link>
@@ -180,7 +180,6 @@ function Nav() {
         {link('/', 'Home')}
         {link('/import', 'Import PDF')}
         {link('/practice', 'Practice')}
-        {link('/full-test-setup', 'Full Test')}
         {link('/history', 'History')}
       </nav>
     )

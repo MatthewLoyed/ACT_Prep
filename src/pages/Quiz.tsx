@@ -3,6 +3,10 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getActiveTest } from '../lib/testStore'
 import type { SectionId } from '../lib/testStore'
 import { motion, AnimatePresence } from 'framer-motion'
+import StudyBuddy from '../components/StudyBuddy'
+import SuccessCelebration from '../components/SuccessCelebration'
+import TrophyAnimation from '../components/TrophyAnimation'
+import SimpleParticles from '../components/SimpleParticles'
 
 type Question = {
   id: string
@@ -26,6 +30,11 @@ export default function Quiz() {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [score, setScore] = useState<number>(0)
   const [showTimesUp, setShowTimesUp] = useState<boolean>(false)
+  const [streak, setStreak] = useState<number>(0)
+  const [showStreakMessage, setShowStreakMessage] = useState<boolean>(false)
+  const [showStudyBuddy, setShowStudyBuddy] = useState<boolean>(false)
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState<boolean>(false)
+  const [showTrophy, setShowTrophy] = useState<boolean>(false)
 
   const correctAudio = useRef<HTMLAudioElement | null>(null)
   const incorrectAudio = useRef<HTMLAudioElement | null>(null)
@@ -68,6 +77,32 @@ export default function Quiz() {
     setSelected(i)
     const correct = i === current.answerIndex
     setIsCorrect(correct)
+    
+    // Handle streak logic and celebrations
+    if (correct) {
+      setStreak(prev => {
+        const newStreak = prev + 1
+        // Show celebrations for milestones
+        if (newStreak >= 3 && (newStreak % 3 === 0 || newStreak === 5 || newStreak === 10)) {
+          setShowStreakMessage(true)
+          setShowStudyBuddy(true)
+          setShowSuccessCelebration(true)
+          setTimeout(() => {
+            setShowStreakMessage(false)
+            setShowStudyBuddy(false)
+            setShowSuccessCelebration(false)
+          }, 3000)
+        } else if (newStreak === 1) {
+          // Show success celebration for first correct answer
+          setShowSuccessCelebration(true)
+          setTimeout(() => setShowSuccessCelebration(false), 2000)
+        }
+        return newStreak
+      })
+    } else {
+      setStreak(0) // Reset streak on wrong answer
+    }
+    
     ;(correct ? correctAudio.current : incorrectAudio.current)?.play().catch(() => {})
   }
 
@@ -89,6 +124,9 @@ export default function Quiz() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Background Particles */}
+      <SimpleParticles count={10} />
+
       <audio ref={correctAudio} src="/sounds/correct_answer.mp3" preload="auto" />
       <audio ref={incorrectAudio} src="/sounds/wrong_answer.wav" preload="auto" />
       <audio ref={timeupAudio} src="/sounds/timeup.mp3" preload="auto" />
@@ -112,7 +150,7 @@ export default function Quiz() {
       {questions.length > 0 && (
         <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800/70 overflow-hidden mb-3">
           <div
-            className="h-full bg-gradient-to-r from-sky-500 to-violet-500 transition-all"
+            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
             style={{ width: `${(Object.keys(results).length / questions.length) * 100}%` }}
           />
         </div>
@@ -194,6 +232,46 @@ export default function Quiz() {
                 )}
               </AnimatePresence>
 
+              {/* Streak Display */}
+              {streak > 0 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-lg">🔥</span>
+                    <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                      {streak} in a row!
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Streak Celebration Message */}
+              <AnimatePresence>
+                {showStreakMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
+                    className="mt-4 p-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl shadow-lg"
+                  >
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-2xl">🎉</span>
+                      <div className="text-center">
+                        <div className="font-bold text-lg">
+                          {streak} in a row!
+                        </div>
+                        <div className="text-sm opacity-90">
+                          {streak >= 10 ? "Incredible! You're on fire! 🔥" :
+                           streak >= 5 ? "Amazing! Keep it up! 💪" :
+                           "Great job! Keep going! ✨"}
+                        </div>
+                      </div>
+                      <span className="text-2xl">🎉</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="mt-5 flex justify-end">
                 <button className="btn btn-primary" onClick={goNext} disabled={selected === null}>
                   {index + 1 >= questions.length ? 'Finish' : 'Next'}
@@ -224,6 +302,38 @@ export default function Quiz() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Visual Enhancement Components */}
+      <StudyBuddy 
+        streak={streak}
+        isCorrect={isCorrect || false}
+        showMessage={showStudyBuddy}
+        onMessageComplete={() => setShowStudyBuddy(false)}
+      />
+      
+      {/* Persistent Study Buddy */}
+      <StudyBuddy 
+        streak={streak}
+        isCorrect={false}
+        showMessage={false}
+        onMessageComplete={() => {}}
+        persistent={true}
+      />
+      
+      <SuccessCelebration 
+        show={showSuccessCelebration}
+        onComplete={() => setShowSuccessCelebration(false)}
+        type={streak >= 3 ? 'streak' : 'correct'}
+        message={streak >= 3 ? `Amazing ${streak} in a row!` : 'Correct!'}
+      />
+      
+      <TrophyAnimation 
+        show={showTrophy}
+        onComplete={() => setShowTrophy(false)}
+        type="section"
+      />
+      
+
     </div>
   )
 }

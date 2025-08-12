@@ -3,9 +3,9 @@ import { motion } from 'framer-motion'
 
 const subjects = [
   { id: 'english', title: 'English', color: 'from-rose-400 to-rose-600', blurb: 'Grammar, usage, punctuation, and rhetorical skills.' },
-  { id: 'math', title: 'Math', color: 'from-sky-400 to-sky-600', blurb: 'Algebra, geometry, functions, and number sense.' },
+  { id: 'math', title: 'Math', color: 'from-emerald-400 to-emerald-600', blurb: 'Algebra, geometry, functions, and number sense.' },
   { id: 'reading', title: 'Reading', color: 'from-emerald-400 to-emerald-600', blurb: 'Comprehension, inference, and author’s purpose.' },
-  { id: 'science', title: 'Science', color: 'from-violet-400 to-violet-600', blurb: 'Data interpretation, experiment design, and reasoning.' },
+  { id: 'science', title: 'Science', color: 'from-teal-400 to-teal-600', blurb: 'Data interpretation, experiment design, and reasoning.' },
 ]
 
 export default function SubjectSelect() {

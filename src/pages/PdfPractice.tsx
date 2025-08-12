@@ -9,6 +9,10 @@ import { loadTestFromSupabase } from '../lib/supabaseTestStore'
 // Define types locally
 type SectionId = 'english' | 'math' | 'reading' | 'science'
 import { AnimatePresence, motion } from 'framer-motion'
+import StudyBuddy from '../components/StudyBuddy'
+import SuccessCelebration from '../components/SuccessCelebration'
+import SimpleParticles from '../components/SimpleParticles'
+import EngagingLoader from '../components/EngagingLoader'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 
@@ -94,6 +98,10 @@ export default function PdfPractice() {
   const [correctAudio] = useState(() => new Audio('/sounds/correct_answer.mp3'))
   const [wrongAudio] = useState(() => new Audio('/sounds/wrong_answer.wav'))
   const [feedback, setFeedback] = useState<{ ok: boolean; id: string } | null>(null)
+  const [streak, setStreak] = useState<number>(0)
+  const [showStreakMessage, setShowStreakMessage] = useState<boolean>(false)
+  const [showStudyBuddy, setShowStudyBuddy] = useState<boolean>(false)
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState<boolean>(false)
   const [qIdx, setQIdx] = useState<number>(0)
   const [testCompleted, setTestCompleted] = useState<boolean>(false)
   const [lastManualAdvance, setLastManualAdvance] = useState<number | null>(null)
@@ -111,6 +119,8 @@ export default function PdfPractice() {
     setLastManualAdvance(null)
     setLastAutoSkip(null)
     setCurrentPageText('')
+    setStreak(0) // Reset streak when changing subjects
+    setShowStreakMessage(false) // Hide any existing streak message
     // Reset page number to 1, will be updated by the section detection useEffect
     setPageNum(1)
   }, [subject])
@@ -203,12 +213,12 @@ export default function PdfPractice() {
             // For reading, start on the section header page (even if no questions)
             if (subject === 'reading') {
               // Reading page detection debug removed - issue fixed
-              if (mounted) {
-                setPageNum(i)
-                // Set a flag to prevent auto-skip from overriding this page
-                setLastManualAdvance(i)
-              }
-              break
+                              if (mounted) {
+                  setPageNum(i)
+                  // Set a flag to prevent auto-skip from overriding this page
+                  setLastManualAdvance(i)
+                }
+                break
             } else {
               // For other sections, look for actual questions with answer choices
               const hasQuestions = /\d{1,2}[.)]\s+[^]*?[A-DFGHJ][.)]\s+/.test(text)
@@ -227,6 +237,11 @@ export default function PdfPractice() {
             }
           }
         }
+      }
+      
+      // If we get here, no page was found, so mark detection as complete
+      if (mounted) {
+        // Page detection complete
       }
     })()
     return () => { 
@@ -357,8 +372,10 @@ export default function PdfPractice() {
         fitScale = Math.max(1, containerWidth / natural.width)
       }
       const viewport = page.getViewport({ scale: fitScale * zoom })
-      const canvas = canvasRef.current!
-      const ctx = canvas.getContext('2d')!
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
       canvas.width = viewport.width
       canvas.height = viewport.height
       await page.render({ canvasContext: ctx, viewport, canvas }).promise
@@ -477,6 +494,8 @@ export default function PdfPractice() {
     setTestCompleted(false)
     setLastManualAdvance(null)
     setLastAutoSkip(null)
+    setStreak(0) // Reset streak when switching sections
+    setShowStreakMessage(false) // Hide any existing streak message
     console.log(`Switched to ${subject} section - cleared previous test data`)
   }, [subject])
 
@@ -523,6 +542,36 @@ export default function PdfPractice() {
     setAnswers(prev => ({ ...prev, [qid]: idx }))
     const ok = typeof correctIdx === 'number' ? idx === correctIdx : false
     setFeedback({ ok, id: qid })
+    
+    // Handle streak logic and celebrations
+    if (ok) {
+      setStreak(prev => {
+        const newStreak = prev + 1
+        // Show celebrations for milestones
+        if (newStreak >= 3 && (newStreak % 3 === 0 || newStreak === 5 || newStreak === 10)) {
+          setShowStreakMessage(true)
+          setShowStudyBuddy(true)
+          setShowSuccessCelebration(true)
+          setTimeout(() => {
+            setShowStreakMessage(false)
+            setShowStudyBuddy(false)
+            setShowSuccessCelebration(false)
+          }, 3000)
+        } else if (newStreak === 1) {
+          // Show success celebration for first correct answer
+          setShowSuccessCelebration(true)
+          setTimeout(() => setShowSuccessCelebration(false), 2000)
+        } else if (newStreak >= 2) {
+          // Show mascot for any streak of 2 or more
+          setShowStudyBuddy(true)
+          setTimeout(() => setShowStudyBuddy(false), 2000)
+        }
+        return newStreak
+      })
+    } else {
+      setStreak(0) // Reset streak on wrong answer
+    }
+    
     try { (ok ? correctAudio : wrongAudio).currentTime = 0 } catch { /* ignore */ }
     ;(ok ? correctAudio : wrongAudio).play().catch(() => {})
     // Keep feedback visible longer so colors stay - only clear when moving to next question
@@ -538,8 +587,11 @@ export default function PdfPractice() {
 
   return (
     <div className="h-dvh flex flex-col">
+      {/* Background Particles */}
+      <SimpleParticles count={15} />
+
       {/* Test Title Bar */}
-      <div className="bg-gradient-to-r from-sky-600 to-purple-600 text-white p-4">
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-4">
         <div className="flex items-center justify-between">
           <button 
             className="btn btn-ghost text-white hover:bg-white/20 border-white/20"
@@ -551,7 +603,7 @@ export default function PdfPractice() {
             <h1 className="text-3xl font-bold tracking-wide">
               {subject?.toUpperCase()} TEST
             </h1>
-            <p className="text-sky-100 mt-1">
+            <p className="text-emerald-100 mt-1">
               {subject === 'english' && '35 Minutes — 50 Questions'}
               {subject === 'math' && '50 Minutes — 45 Questions'}
               {subject === 'reading' && '40 Minutes — 36 Questions'}
@@ -559,6 +611,17 @@ export default function PdfPractice() {
             </p>
           </div>
           <div className="w-24"></div> {/* Spacer to center the title */}
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="bg-white/20 h-2 mt-2 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500 ease-out"
+            style={{ width: `${Math.min(100, (Object.keys(answers).length / allQuestions.length) * 100)}%` }}
+          />
+        </div>
+        <div className="text-center mt-1 text-sm text-emerald-100">
+          {Object.keys(answers).length} of {allQuestions.length} questions answered
         </div>
       </div>
       
@@ -594,6 +657,17 @@ export default function PdfPractice() {
                 Back to Test Selection
               </button>
             </div>
+          </div>
+        ) : isPageDetectionRunning ? (
+          <div className="col-span-2 card p-8 text-center">
+            <EngagingLoader 
+              message="Finding the right page for your test..." 
+              size="lg"
+              showThinking={true}
+            />
+            <p className="text-slate-600 dark:text-slate-400 mt-4">
+              We're scanning through the PDF to find the {subject} section for you.
+            </p>
           </div>
         ) : (
           <>
@@ -804,6 +878,46 @@ export default function PdfPractice() {
                   )}
                 </AnimatePresence>
 
+                {/* Streak Display */}
+                {streak > 0 && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg">🔥</span>
+                      <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                        {streak} in a row!
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Streak Celebration Message */}
+                <AnimatePresence>
+                  {showStreakMessage && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                      transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
+                      className="mt-4 p-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl shadow-lg"
+                    >
+                      <div className="flex items-center justify-center gap-3">
+                        <span className="text-2xl">🎉</span>
+                        <div className="text-center">
+                          <div className="font-bold text-lg">
+                            {streak} in a row!
+                          </div>
+                          <div className="text-sm opacity-90">
+                            {streak >= 10 ? "Incredible! You're on fire! 🔥" :
+                             streak >= 5 ? "Amazing! Keep it up! 💪" :
+                             "Great job! Keep going! ✨"}
+                          </div>
+                        </div>
+                        <span className="text-2xl">🎉</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="mt-20 flex justify-end gap-2">
                   <button className="btn btn-ghost" onClick={() => setQIdx(i => Math.max(0, i - 1))} disabled={qIdx === 0}>Prev question</button>
                   <button
@@ -884,6 +998,32 @@ export default function PdfPractice() {
       </>
         )}
       </div>
+      
+      {/* Visual Enhancement Components */}
+      <StudyBuddy 
+        streak={streak}
+        isCorrect={feedback?.ok || false}
+        showMessage={showStudyBuddy}
+        onMessageComplete={() => setShowStudyBuddy(false)}
+      />
+      
+      {/* Persistent Study Buddy */}
+      <StudyBuddy 
+        streak={streak}
+        isCorrect={false}
+        showMessage={false}
+        onMessageComplete={() => {}}
+        persistent={true}
+      />
+      
+      <SuccessCelebration 
+        show={showSuccessCelebration}
+        onComplete={() => setShowSuccessCelebration(false)}
+        type={streak >= 3 ? 'streak' : 'correct'}
+        message={streak >= 3 ? `Amazing ${streak} in a row!` : 'Correct!'}
+      />
+      
+
     </div>
   )
 }

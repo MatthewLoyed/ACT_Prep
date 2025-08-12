@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 
+
 const features = [
   { title: 'Instant feedback', desc: 'Hear and see if you’re right, immediately.', icon: '✅' },
   { title: 'Real questions', desc: 'Practice with recent ACT®-style questions.', icon: '📝' },
@@ -24,12 +25,12 @@ export default function Landing() {
       <div className="container grid place-items-center">
         <div className="max-w-4xl text-center">
           <motion.h1
-            className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-sky-600 via-purple-600 to-emerald-600 bg-clip-text text-transparent"
+            className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            ACT® prep that feels fun
+            ACT® Prep that feels fun
           </motion.h1>
           <motion.p
             className="mt-6 text-xl text-slate-600 dark:text-slate-300 leading-relaxed"
@@ -58,7 +59,7 @@ export default function Landing() {
       {/* Features */}
       <div id="features" className="container mt-20">
         <motion.h2 
-          className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent"
+          className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -77,8 +78,8 @@ export default function Landing() {
               className="card p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
             >
               <div className="flex items-start gap-4">
-                <div className="text-3xl p-2 rounded-xl bg-gradient-to-br from-sky-100 to-purple-100 dark:from-sky-900 dark:to-purple-900">
-                  {f.icon}
+                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900 dark:to-teal-900">
+                  <div className="text-2xl">{f.icon}</div>
                 </div>
                 <div>
                   <h3 className="font-bold text-xl mb-2">{f.title}</h3>
@@ -93,7 +94,7 @@ export default function Landing() {
       {/* Why better */}
       <div className="container mt-20">
         <motion.div 
-          className="card p-8 bg-gradient-to-br from-sky-50 to-purple-50 dark:from-sky-950 dark:to-purple-950 border border-sky-200 dark:border-sky-800"
+          className="card p-8 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 border border-emerald-200 dark:border-emerald-800"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -101,7 +102,7 @@ export default function Landing() {
         >
           <div className="text-center mb-8">
             <div className="text-4xl mb-4">🚀</div>
-            <h3 className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent">
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
               Why This Beats Traditional Test Prep
             </h3>
           </div>

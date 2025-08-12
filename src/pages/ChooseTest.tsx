@@ -49,7 +49,7 @@ export default function ChooseTest() {
                   <div className="font-semibold">{t.name}</div>
                   <div className="text-sm text-slate-600 dark:text-slate-400">{new Date(t.createdAt).toLocaleString()}</div>
                 </div>
-                <div className={`ml-4 size-3 rounded-full ${active === t.id ? 'bg-sky-500' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                <div className={`ml-4 size-3 rounded-full ${active === t.id ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`} />
               </button>
             </div>
             {active === t.id && (

@@ -2,13 +2,21 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { loadTestFromSupabase } from '../lib/supabaseTestStore'
 import { useEffect, useState } from 'react'
+import { 
+  BookOpen,
+  Calculator,
+  FileText,
+  Flask,
+  ClipboardText
+} from '@phosphor-icons/react'
+import EngagingLoader from '../components/EngagingLoader'
 
 const subjects = [
   { 
     id: 'english', 
     title: 'English', 
     color: 'from-rose-400 to-rose-600', 
-    icon: '📚',
+    icon: BookOpen,
     blurb: 'Grammar, usage, punctuation, and rhetorical skills.',
     time: '35 minutes',
     questions: '50 questions'
@@ -16,8 +24,8 @@ const subjects = [
   { 
     id: 'math', 
     title: 'Math', 
-    color: 'from-sky-400 to-sky-600', 
-    icon: '🧮',
+    color: 'from-emerald-400 to-emerald-600', 
+    icon: Calculator,
     blurb: 'Algebra, geometry, functions, and number sense.',
     time: '50 minutes',
     questions: '45 questions'
@@ -26,7 +34,7 @@ const subjects = [
     id: 'reading', 
     title: 'Reading', 
     color: 'from-emerald-400 to-emerald-600', 
-    icon: '📖',
+    icon: FileText,
     blurb: 'Comprehension, inference, and author\'s purpose.',
     time: '40 minutes',
     questions: '36 questions'
@@ -35,14 +43,24 @@ const subjects = [
   { 
     id: 'science', 
     title: 'Science', 
-    color: 'from-violet-400 to-violet-600', 
-    icon: '🔬',
+    color: 'from-teal-400 to-teal-600', 
+    icon: Flask,
     blurb: 'Data interpretation, experiment design, and reasoning.',
     time: '40 minutes',
     questions: '40 questions',
     comingSoon: true
   },
 ]
+
+const fullTestOption = {
+  id: 'full', 
+  title: 'Full Test', 
+      color: 'from-cyan-400 to-cyan-600', 
+  icon: ClipboardText,
+  blurb: 'Complete ACT® test with all sections and timing.',
+  time: '2 hours 55 minutes',
+  questions: 'All sections'
+}
 
 export default function TestSelection() {
   const { testId } = useParams()
@@ -70,9 +88,12 @@ export default function TestSelection() {
   
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto text-center">
-        <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-4">Please wait while we load your test.</p>
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <EngagingLoader 
+          message="Loading your test..." 
+          size="lg"
+          showThinking={true}
+        />
       </div>
     )
   }
@@ -91,6 +112,12 @@ export default function TestSelection() {
   const handleSubjectSelect = (subjectId: string) => {
     if (subjectId === 'science') {
       alert('Science section coming soon!')
+      return
+    }
+    
+    if (subjectId === 'full') {
+      // Navigate to full test setup
+      navigate(`/full-test-setup?testId=${testId}`)
       return
     }
     
@@ -130,16 +157,16 @@ export default function TestSelection() {
                 onClick={() => handleSubjectSelect(s.id)}
                 disabled={!isAvailable}
               >
-                                 <div className={`card overflow-hidden transition-all duration-300 ${isAvailable ? 'hover:shadow-xl group-hover:-translate-y-2 hover:scale-105' : ''}`}>
-                   <div className={`h-32 bg-gradient-to-br ${s.color} relative overflow-hidden flex items-center justify-center`}>
-                     <div className="text-6xl mb-2">{s.icon}</div>
-                     {s.comingSoon && (
-                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                         <span className="text-white font-bold text-lg">Coming Soon</span>
-                       </div>
-                     )}
-                     <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
-                   </div>
+                <div className={`card overflow-hidden transition-all duration-300 ${isAvailable ? 'hover:shadow-xl group-hover:-translate-y-2 hover:scale-105' : ''}`}>
+                  <div className={`h-32 bg-gradient-to-br ${s.color} relative overflow-hidden flex items-center justify-center`}>
+                    <s.icon className="w-12 h-12 text-white" weight="fill" />
+                    {s.comingSoon && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">Coming Soon</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
+                  </div>
                   <div className="p-5 space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -180,6 +207,57 @@ export default function TestSelection() {
             </motion.div>
           )
         })}
+      </div>
+      
+      {/* Full Test Option - Spans 2 columns */}
+      <div className="mt-8">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="col-span-2"
+        >
+          <button 
+            className="block group w-full cursor-pointer"
+            onClick={() => handleSubjectSelect(fullTestOption.id)}
+          >
+                            <div className="card overflow-hidden transition-all duration-300 hover:shadow-xl group-hover:-translate-y-2 hover:scale-105 border-2 border-cyan-200 dark:border-cyan-800">
+              <div className={`h-40 bg-gradient-to-br ${fullTestOption.color} relative overflow-hidden flex items-center justify-center`}>
+                <fullTestOption.icon className="w-20 h-20 text-white" weight="fill" />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
+                <div className="absolute top-4 right-4">
+                  <span className="inline-block rounded-full bg-white/20 text-white px-3 py-1 text-sm font-semibold">
+                    Complete Test
+                  </span>
+                </div>
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold">{fullTestOption.title}</h3>
+                    <p className="text-lg text-slate-600 dark:text-slate-400">
+                      {fullTestOption.time} • {fullTestOption.questions}
+                    </p>
+                  </div>
+                  <span className="opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-2 text-3xl">→</span>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 text-lg">{fullTestOption.blurb}</p>
+                
+                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                  <span className="inline-block rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 font-semibold">
+                    Full Test Available
+                  </span>
+                  <span className="inline-block rounded-full bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 px-3 py-1 font-semibold">
+                    Timed Test
+                  </span>
+                  <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 font-semibold">
+                    All Sections
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </motion.div>
       </div>
       
       <div className="mt-8 text-center">

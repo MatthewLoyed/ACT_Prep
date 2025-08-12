@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 import { getNextDefaultName, saveTestToSupabase } from '../lib/supabaseTestStore'
+import EngagingLoader from '../components/EngagingLoader'
 
 // Configure pdfjs worker from local node_modules to avoid CDN import failures
 // Vite will serve this asset in dev
@@ -28,9 +29,11 @@ export default function ImportTest() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [status, setStatus] = useState<string>('Drop a PDF or choose a file to parse…')
   const [results, setResults] = useState<Extracted[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
 
   async function parsePdf(file: File) {
     try {
+      setIsProcessing(true)
       // Import debug removed
       
       // Check file size - limit to 50MB to prevent memory issues
@@ -234,6 +237,8 @@ export default function ImportTest() {
     } catch (error) {
       console.error('IMPORT DEBUG: Error during PDF parsing:', error)
       setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -793,7 +798,7 @@ export default function ImportTest() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent">
+        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
           Import Practice Test
         </h2>
         <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
@@ -802,23 +807,35 @@ export default function ImportTest() {
       </div>
 
       <div className="card p-8 text-center">
-        <div className="mb-6">
-          <div className="text-6xl mb-4">📄</div>
-          <h3 className="text-2xl font-semibold mb-2">Ready to Import?</h3>
-          <p className="text-slate-600 dark:text-slate-400">
-            Simply upload your ACT® practice test PDF and we'll handle the rest
-          </p>
-        </div>
-        <div className="flex items-center justify-center gap-4">
-          <input ref={inputRef} type="file" accept="application/pdf" onChange={onFile} className="hidden" />
-          <button 
-            className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200" 
-            onClick={() => inputRef.current?.click()}
-          >
-            Choose PDF File
-          </button>
-        </div>
-        <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">{status}</div>
+        {isProcessing ? (
+          <div className="py-8">
+            <EngagingLoader 
+              message={status} 
+              size="lg"
+              showThinking={true}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="mb-6">
+              <div className="text-6xl mb-4">📄</div>
+              <h3 className="text-2xl font-semibold mb-2">Ready to Import?</h3>
+              <p className="text-slate-600 dark:text-slate-400">
+                Simply upload your ACT® practice test PDF and we'll handle the rest
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <input ref={inputRef} type="file" accept="application/pdf" onChange={onFile} className="hidden" />
+              <button 
+                className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200" 
+                onClick={() => inputRef.current?.click()}
+              >
+                Choose PDF File
+              </button>
+            </div>
+            <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">{status}</div>
+          </>
+        )}
       </div>
 
       {results.length > 0 && (

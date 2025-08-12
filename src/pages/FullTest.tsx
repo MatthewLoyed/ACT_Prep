@@ -116,7 +116,7 @@ export default function FullTest() {
 
       {/* Progress bar of entire test */}
       <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800/70 overflow-hidden mb-3">
-        <div className="h-full bg-gradient-to-r from-sky-500 to-violet-500 transition-all" style={{ width: `${(answeredCount / totalCount) * 100}%` }} />
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all" style={{ width: `${(answeredCount / totalCount) * 100}%` }} />
       </div>
 
       <div className="card p-5">
