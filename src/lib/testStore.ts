@@ -1,11 +1,11 @@
 // Define types locally to avoid module resolution issues
-type SectionId = 'english' | 'math' | 'reading' | 'science'
+export type SectionId = 'english' | 'math' | 'reading' | 'science'
 
-type TestBundle = {
+export type TestBundle = {
   id: string
   name: string
   createdAt: string
-  sections: Partial<Record<SectionId, any[]>>
+  sections: Partial<Record<SectionId, unknown[]>>
   pdfData?: string // Base64 encoded PDF data
 }
 
@@ -41,7 +41,7 @@ export function saveTest(bundle: Omit<TestBundle, 'id' | 'createdAt'>): TestBund
     localStorage.setItem(TESTS_KEY, JSON.stringify(tests))
     console.log('TESTSTORE DEBUG: Test saved successfully')
     return full
-  } catch (error) {
+  } catch {
     console.error('TESTSTORE DEBUG: Storage quota exceeded, attempting to free space...')
     
     // Try to free space by removing old tests
@@ -63,7 +63,7 @@ export function saveTest(bundle: Omit<TestBundle, 'id' | 'createdAt'>): TestBund
           localStorage.setItem(TESTS_KEY, JSON.stringify(filteredTests))
           console.log('TESTSTORE DEBUG: Test saved after removing oldest test')
           return full
-        } catch (secondError) {
+        } catch {
           console.error('TESTSTORE DEBUG: Still quota exceeded after removing oldest test')
           throw new Error('Storage quota exceeded. Please clear some tests manually.')
         }
@@ -103,7 +103,6 @@ export function getNextDefaultName(): string {
 
 export function cryptoRandomId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    // @ts-ignore
     return crypto.randomUUID()
   }
   return Math.random().toString(36).slice(2)

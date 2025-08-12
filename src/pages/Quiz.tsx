@@ -35,7 +35,7 @@ export default function Quiz() {
     if (!subject) return
     const active = getActiveTest()
     if (active && active.sections[subject as SectionId]) {
-      setQuestions(active.sections[subject as SectionId] as Question[])
+      setQuestions(active.sections[subject as SectionId] as unknown as Question[])
       return
     }
     fetch(`/questions/${subject}.json`).then(r => r.json()).then((data: Question[]) => setQuestions(data)).catch(() => setQuestions([]))
