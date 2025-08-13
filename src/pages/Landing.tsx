@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import BlurText from '../components/BlurText'
+import TextType from '../components/TextType'
 
 
 const features = [
@@ -24,22 +26,28 @@ export default function Landing() {
       {/* Hero */}
       <div className="container grid place-items-center">
         <div className="max-w-4xl text-center">
-          <motion.h1
-            className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          >
-            ACT® Prep that feels fun
-          </motion.h1>
-          <motion.p
-            className="mt-6 text-xl text-slate-600 dark:text-slate-300 leading-relaxed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.4 }}
-          >
-            Skip the stale PDFs. Practice one question at a time with lively feedback, a clean UI, and smooth microanimations.
-          </motion.p>
+          <BlurText
+            text="ACT® Prep that feels fun"
+            className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl mb-6"
+            delay={100}
+            animateBy="words"
+            direction="top"
+            stepDuration={0.4}
+          />
+          <TextType
+            text={[
+              "Skip the stale PDFs. Practice one question at a time with lively feedback, a clean UI, and smooth microanimations.",
+              "Master the ACT® with interactive practice sessions that adapt to your learning style.",
+              "Transform test prep from boring to engaging with our modern, gamified approach."
+            ]}
+            className="mt-6 text-xl text-secondary leading-relaxed"
+            typingSpeed={50}
+            pauseDuration={3000}
+            showCursor={true}
+            cursorCharacter="|"
+            loop={true}
+            textColors={["#E2E8F0"]}
+          />
           <motion.div 
             className="mt-10 flex items-center justify-center gap-4" 
             initial={{ opacity: 0, y: 20 }} 
@@ -59,7 +67,7 @@ export default function Landing() {
       {/* Features */}
       <div id="features" className="container mt-20">
         <motion.h2 
-          className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent"
+          className="text-3xl font-bold text-center mb-12 text-high-contrast-bold text-shadow-lg"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -78,12 +86,12 @@ export default function Landing() {
               className="card p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
             >
               <div className="flex items-start gap-4">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900 dark:to-teal-900">
+                <div className="p-2 rounded-xl glass-card">
                   <div className="text-2xl">{f.icon}</div>
                 </div>
                 <div>
                   <h3 className="font-bold text-xl mb-2">{f.title}</h3>
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{f.desc}</p>
+                  <p className="text-secondary leading-relaxed">{f.desc}</p>
                 </div>
               </div>
             </motion.div>
@@ -94,50 +102,119 @@ export default function Landing() {
       {/* Why better */}
       <div className="container mt-20">
         <motion.div 
-          className="card p-8 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 border border-emerald-200 dark:border-emerald-800"
+          className="card p-8"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-8">
-            <div className="text-4xl mb-4">🚀</div>
-            <h3 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
-              Why This Beats Traditional Test Prep
-            </h3>
+            <motion.div 
+              className="text-4xl mb-4"
+              initial={{ scale: 0, rotate: -180 }}
+              whileInView={{ scale: 1, rotate: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, type: "spring" }}
+            >
+              🚀
+            </motion.div>
+            <BlurText
+              text="Why This Beats Traditional Test Prep"
+              className="text-3xl font-bold text-high-contrast-bold text-shadow-lg"
+              delay={50}
+              animateBy="words"
+              direction="top"
+              stepDuration={0.3}
+            />
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">⚡</div>
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+                >
+                  ⚡
+                </motion.div>
                 <div>
                   <h4 className="font-semibold text-lg">Quick Wins</h4>
-                  <p className="text-slate-600 dark:text-slate-300">Chunk your practice into bite-sized sessions instead of exhausting marathons.</p>
+                  <p className="text-secondary">Chunk your practice into bite-sized sessions instead of exhausting marathons.</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🎯</div>
+              </motion.div>
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3, duration: 0.6, type: "spring" }}
+                >
+                  🎯
+                </motion.div>
                 <div>
                   <h4 className="font-semibold text-lg">Instant Feedback</h4>
-                  <p className="text-slate-600 dark:text-slate-300">Learn from mistakes immediately and stay motivated with real-time results.</p>
+                  <p className="text-secondary">Learn from mistakes immediately and stay motivated with real-time results.</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
             <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">✨</div>
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+                >
+                  ✨
+                </motion.div>
                 <div>
                   <h4 className="font-semibold text-lg">Engaging Experience</h4>
-                  <p className="text-slate-600 dark:text-slate-300">Smooth animations and sounds make learning feel rewarding, not stressful.</p>
+                  <p className="text-secondary">Smooth animations and sounds make learning feel rewarding, not stressful.</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🎨</div>
+              </motion.div>
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3, duration: 0.6, type: "spring" }}
+                >
+                  🎨
+                </motion.div>
                 <div>
                   <h4 className="font-semibold text-lg">Distraction-Free</h4>
-                  <p className="text-slate-600 dark:text-slate-300">Clean design with light/dark themes helps you focus on what matters.</p>
+                  <p className="text-secondary">Clean design with light/dark themes helps you focus on what matters.</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         </motion.div>
@@ -157,7 +234,7 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="mt-16 border-t border-slate-200 dark:border-slate-800">
-        <div className="container py-6 text-sm text-slate-600 dark:text-slate-400 flex items-center justify-between">
+                  <div className="container py-6 text-sm text-secondary flex items-center justify-between">
           <div>© 2025 TestPrep Pro — All rights reserved.</div>
           <div className="opacity-80">Made with React, Tailwind CSS, and Framer Motion.</div>
         </div>
@@ -183,7 +260,7 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
         transition={{ duration: 0.25 }}
         className="overflow-hidden"
       >
-        <p className="mt-2 text-slate-600 dark:text-slate-300">{children}</p>
+        <p className="mt-2 text-secondary">{children}</p>
       </motion.div>
     </div>
   )

@@ -31,7 +31,7 @@ export default function EngagingLoader({
   }
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-4">
+    <div className="flex flex-col items-center justify-center space-y-6 relative">
       {/* Main brain animation */}
       <motion.div
         animate={{
@@ -43,7 +43,7 @@ export default function EngagingLoader({
           repeat: Infinity,
           ease: "easeInOut"
         }}
-        className={`${sizeClasses[size]} bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
+        className={`${sizeClasses[size]} bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
       >
         <Brain className={`${iconSizes[size]} text-white`} weight="fill" />
         
@@ -76,6 +76,20 @@ export default function EngagingLoader({
             ))}
           </>
         )}
+
+        {/* Ripple effect - centered on brain */}
+        <motion.div
+          animate={{
+            scale: [1, 1.5, 2],
+            opacity: [0.6, 0.3, 0]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeOut"
+          }}
+          className="absolute inset-0 w-full h-full border-2 border-yellow-400 rounded-full pointer-events-none"
+        />
       </motion.div>
 
       {/* Message */}
@@ -104,25 +118,13 @@ export default function EngagingLoader({
                 delay: i * 0.2,
                 ease: "easeInOut"
               }}
-                             className="w-2 h-2 bg-emerald-500 rounded-full"
+                             className="w-2 h-2 bg-yellow-500 rounded-full"
             />
           ))}
         </motion.div>
       </motion.div>
 
-      {/* Ripple effect */}
-      <motion.div
-        animate={{
-          scale: [1, 1.5, 2],
-          opacity: [0.6, 0.3, 0]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeOut"
-        }}
-        className="absolute w-12 h-12 border-2 border-emerald-400 rounded-full"
-      />
+
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 import { getNextDefaultName, saveTestToSupabase } from '../lib/supabaseTestStore'
 import EngagingLoader from '../components/EngagingLoader'
@@ -796,12 +797,17 @@ export default function ImportTest() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-4xl mx-auto"
+    >
       <div className="text-center mb-8">
         <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
           Import Practice Test
         </h2>
-        <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
+        <p className="text-xl text-secondary max-w-2xl mx-auto">
           Upload your ACT® practice test PDF and we'll automatically extract questions for Math, Reading, and English sections.
         </p>
       </div>
@@ -820,7 +826,7 @@ export default function ImportTest() {
             <div className="mb-6">
               <div className="text-6xl mb-4">📄</div>
               <h3 className="text-2xl font-semibold mb-2">Ready to Import?</h3>
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-secondary">
                 Simply upload your ACT® practice test PDF and we'll handle the rest
               </p>
             </div>
@@ -833,7 +839,7 @@ export default function ImportTest() {
                 Choose PDF File
               </button>
             </div>
-            <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">{status}</div>
+            <div className="mt-4 text-sm text-secondary">{status}</div>
           </>
         )}
       </div>
@@ -844,7 +850,7 @@ export default function ImportTest() {
             <div className="text-center">
               <div className="text-2xl mb-2">✅</div>
               <div className="font-semibold text-lg mb-2">Test Successfully Imported!</div>
-              <div className="text-slate-600 dark:text-slate-400 mb-4">
+              <div className="text-secondary mb-4">
                 Your test has been automatically saved to your library.
               </div>
               <button
@@ -862,7 +868,7 @@ export default function ImportTest() {
               <div key={sec.section} className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0">
                 <div>
                   <span className="font-medium capitalize">{sec.section}</span>
-                  <span className="text-sm text-slate-600 dark:text-slate-400 ml-2">
+                  <span className="text-sm text-secondary ml-2">
                     {sec.questions.length} questions
                   </span>
                 </div>
@@ -871,6 +877,6 @@ export default function ImportTest() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

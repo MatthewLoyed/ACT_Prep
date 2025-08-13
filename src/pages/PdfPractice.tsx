@@ -5,6 +5,7 @@ import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-d
 // @ts-ignore
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+import type { TestBundle } from '../lib/testStore'
 
 // Define types locally
 type SectionId = 'english' | 'math' | 'reading' | 'science'
@@ -13,6 +14,8 @@ import StudyBuddy from '../components/StudyBuddy'
 import SuccessCelebration from '../components/SuccessCelebration'
 import SimpleParticles from '../components/SimpleParticles'
 import EngagingLoader from '../components/EngagingLoader'
+import TestCompletionCelebration from '../components/TestCompletionCelebration'
+import AnimatedCounter from '../components/AnimatedCounter'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 
@@ -40,7 +43,7 @@ export default function PdfPractice() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const leftPaneRef = useRef<HTMLDivElement | null>(null)
 
-  const [active, setActive] = useState<any>(null)
+  const [active, setActive] = useState<TestBundle | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Load test from Supabase
@@ -104,6 +107,7 @@ export default function PdfPractice() {
   const [showSuccessCelebration, setShowSuccessCelebration] = useState<boolean>(false)
   const [qIdx, setQIdx] = useState<number>(0)
   const [testCompleted, setTestCompleted] = useState<boolean>(false)
+  const [showCompletionCelebration, setShowCompletionCelebration] = useState<boolean>(false)
   const [lastManualAdvance, setLastManualAdvance] = useState<number | null>(null)
   const [isPageDetectionRunning, setIsPageDetectionRunning] = useState(false)
   const [currentPageText, setCurrentPageText] = useState<string>('')
@@ -180,7 +184,7 @@ export default function PdfPractice() {
     }
     
     return () => { cancelled = true }
-  }, [testId, active?.pdfData])
+  }, [testId, active])
 
   // Jump to first real question page on load
   useEffect(() => {
@@ -217,6 +221,7 @@ export default function PdfPractice() {
                   setPageNum(i)
                   // Set a flag to prevent auto-skip from overriding this page
                   setLastManualAdvance(i)
+                  setIsPageDetectionRunning(false)
                 }
                 break
             } else {
@@ -229,6 +234,7 @@ export default function PdfPractice() {
                   setPageNum(i)
                   // Set a flag to prevent auto-skip from overriding this page
                   setLastManualAdvance(i)
+                  setIsPageDetectionRunning(false)
                 }
                 break
               } else {
@@ -242,6 +248,7 @@ export default function PdfPractice() {
       // If we get here, no page was found, so mark detection as complete
       if (mounted) {
         // Page detection complete
+        setIsPageDetectionRunning(false)
       }
     })()
     return () => { 
@@ -382,7 +389,7 @@ export default function PdfPractice() {
       canvas.style.width = '100%'
       canvas.style.height = 'auto'
     })()
-  }, [pdf, pageNum, zoom, lastAutoSkip, lastManualAdvance])
+  }, [pdf, pageNum, zoom, lastAutoSkip, lastManualAdvance, subject])
 
   // Preload sounds
   useEffect(() => {
@@ -543,6 +550,15 @@ export default function PdfPractice() {
     const ok = typeof correctIdx === 'number' ? idx === correctIdx : false
     setFeedback({ ok, id: qid })
     
+    // Play sound effects using existing audio files
+    if (ok) {
+      try { correctAudio.currentTime = 0 } catch { /* ignore */ }
+      correctAudio.play().catch(() => {})
+    } else {
+      try { wrongAudio.currentTime = 0 } catch { /* ignore */ }
+      wrongAudio.play().catch(() => {})
+    }
+    
     // Handle streak logic and celebrations
     if (ok) {
       setStreak(prev => {
@@ -552,6 +568,9 @@ export default function PdfPractice() {
           setShowStreakMessage(true)
           setShowStudyBuddy(true)
           setShowSuccessCelebration(true)
+          // Play level up sound for streak milestones
+          const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
+          levelUpAudio.play().catch(() => {})
           setTimeout(() => {
             setShowStreakMessage(false)
             setShowStudyBuddy(false)
@@ -586,13 +605,18 @@ export default function PdfPractice() {
   }, [current])
 
   return (
-    <div className="h-dvh flex flex-col">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="h-dvh flex flex-col"
+    >
       {/* Background Particles */}
       <SimpleParticles count={15} />
 
       {/* Test Title Bar */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <button 
             className="btn btn-ghost text-white hover:bg-white/20 border-white/20"
             onClick={() => navigate(`/test-selection/${testId}`)}
@@ -613,24 +637,32 @@ export default function PdfPractice() {
           <div className="w-24"></div> {/* Spacer to center the title */}
         </div>
         
-        {/* Progress Bar */}
-        <div className="bg-white/20 h-2 mt-2 rounded-full overflow-hidden">
+        {/* Enhanced Progress Bar */}
+        <div className="bg-white/20 h-3 rounded-full overflow-hidden relative">
           <div 
-            className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500 ease-out"
+            className="h-full bg-gradient-to-r from-accent to-accent-secondary transition-all duration-700 ease-out relative"
             style={{ width: `${Math.min(100, (Object.keys(answers).length / allQuestions.length) * 100)}%` }}
-          />
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+            <div className="absolute right-0 top-0 w-2 h-full bg-white/50 rounded-full shadow-lg"></div>
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-bold text-white drop-shadow-lg">
+              {Object.keys(answers).length} / {allQuestions.length}
+            </span>
+          </div>
         </div>
-        <div className="text-center mt-1 text-sm text-emerald-100">
-          {Object.keys(answers).length} of {allQuestions.length} questions answered
+        <div className="text-center mt-2 text-sm text-emerald-100 font-semibold">
+          {Object.keys(answers).length === allQuestions.length ? '🎉 All questions completed!' : 'Keep going!'}
         </div>
       </div>
       
-      <div className="flex-1 grid lg:grid-cols-[3fr_1fr] gap-4 p-4">
+      <div className="flex-1 grid lg:grid-cols-[2fr_1fr] gap-6 p-4">
         {loading ? (
           <div className="col-span-2 card p-8 text-center">
             <div className="text-4xl mb-4">⏳</div>
             <h2 className="text-2xl font-bold mb-4">Loading Test...</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-secondary mb-6">
               Please wait while we load your test from the database.
             </p>
           </div>
@@ -638,7 +670,7 @@ export default function PdfPractice() {
           <div className="col-span-2 card p-8 text-center">
             <div className="text-6xl mb-4">📄</div>
             <h2 className="text-2xl font-bold mb-4">No PDF Available</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-secondary mb-6">
               {!testId ? 'No test selected. Please select a test first.' : 
                !active?.pdfData ? 'This test does not have PDF data. Please re-import the test.' :
                'Loading PDF... Please wait.'}
@@ -665,7 +697,7 @@ export default function PdfPractice() {
               size="lg"
               showThinking={true}
             />
-            <p className="text-slate-600 dark:text-slate-400 mt-4">
+            <p className="text-secondary mt-4">
               We're scanning through the PDF to find the {subject} section for you.
             </p>
           </div>
@@ -680,7 +712,7 @@ export default function PdfPractice() {
             <button className="btn btn-ghost" onClick={() => setZoom(z => Math.min(3, parseFloat((z + 0.1).toFixed(2))))}>+</button>
           </div>
         </div>
-        <canvas ref={canvasRef} className="mx-auto" />
+        <canvas ref={canvasRef} className="mx-auto w-full" style={{ maxWidth: '100%', height: 'auto' }} />
         <div className="flex items-center justify-between mt-2 px-2 pb-2">
           <button className="btn btn-ghost" onClick={() => setPageNum(p => Math.max(1, p - 1))}>Prev</button>
           <button className="btn btn-primary" onClick={() => {
@@ -697,31 +729,31 @@ export default function PdfPractice() {
       </div>
 
       <div className="space-y-4">
-        {testCompleted ? (
-          <div className="card p-6 text-center">
-            <div className="text-2xl font-bold text-emerald-600 mb-2">🎉 Test Completed!</div>
-            <div className="text-slate-600 dark:text-slate-400">
+                {testCompleted ? (
+          <div className="card p-6 text-center bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-2 border-emerald-400/50">
+            <div className="text-3xl font-bold text-emerald-300 mb-3 text-shadow-lg">🎉 Test Completed! 🎉</div>
+            <div className="text-white text-lg font-semibold mb-4">
               You have completed the {subject.toUpperCase()} test.
             </div>
             <div className="flex gap-3 justify-center mt-4">
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowCompletionCelebration(true)}
+              >
+                View Results
+              </button>
               <button 
                 className="btn btn-ghost"
                 onClick={() => navigate(`/test-selection/${testId}`)}
               >
                 ← Back to Subjects
               </button>
-              <button 
-                className="btn btn-primary"
-                onClick={() => navigate('/practice')}
-              >
-                Back to Test Selection
-              </button>
             </div>
           </div>
-                ) : (
+        ) : (
           <>
             <div className="card p-4">
-              <div className="text-sm text-slate-600 dark:text-slate-400">Questions on this page</div>
+              <div className="text-sm text-secondary">Questions on this page</div>
               {pageQuestions.length === 0 && (
                 <div className="mt-2 text-sm">
                   {subject === 'reading' ? (
@@ -792,19 +824,24 @@ export default function PdfPractice() {
             {current && (
               <motion.div
                 key={current.id}
-                className="card p-4"
+                className="card p-4 max-h-[75vh] overflow-y-auto"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Question {currentNum ?? ''}:
+                <div className="text-xs uppercase tracking-wide text-secondary mb-3 flex items-center justify-between">
+                  <span>Question {currentNum ?? ''}:</span>
+                  {streak > 0 && (
+                    <div className="bg-gradient-to-r from-orange-400 to-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                      <AnimatedCounter value={streak} fontSize={12} textColor="white" fontWeight="bold" />
+                    </div>
+                  )}
                 </div>
-                <div className="font-medium mb-2 mt-1">
+                <div className="font-medium mb-4 mt-1">
                   {cleanMathText(current.prompt)}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {current.choices.map((_, i) => {
                     // Determine the state for each choice
                     let state = ''
@@ -864,109 +901,109 @@ export default function PdfPractice() {
                   })}
                 </div>
 
+
+
+
+
+                {/* Streak Celebration Message */}
+                <div className="relative h-20">
+                  <AnimatePresence>
+                    {showStreakMessage && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                        transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
+                        className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl shadow-lg"
+                      >
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-2xl">🎉</span>
+                          <div className="text-center">
+                            <div className="font-bold text-lg">
+                              {streak} in a row!
+                            </div>
+                            <div className="text-sm opacity-90">
+                              {streak >= 10 ? "Incredible! You're on fire! 🔥" :
+                               streak >= 5 ? "Amazing! Keep it up! 💪" :
+                               "Great job! Keep going! ✨"}
+                            </div>
+                          </div>
+                          <span className="text-2xl">🎉</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                                </div>
+
+                {/* Feedback Message - Centered */}
                 <AnimatePresence>
                   {feedback?.id === current.id && (
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: 6 }}
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -6 }}
-                      transition={{ duration: 0.2 }}
-                      className={`mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-1 text-sm ${feedback.ok ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'}`}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="flex justify-center my-4"
                     >
-                      {feedback.ok ? 'Correct!' : 'Incorrect'}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Streak Display */}
-                {streak > 0 && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <span className="text-lg">🔥</span>
-                      <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                        {streak} in a row!
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Streak Celebration Message */}
-                <AnimatePresence>
-                  {showStreakMessage && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                      transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
-                      className="mt-4 p-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl shadow-lg"
-                    >
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="text-2xl">🎉</span>
-                        <div className="text-center">
-                          <div className="font-bold text-lg">
-                            {streak} in a row!
-                          </div>
-                          <div className="text-sm opacity-90">
-                            {streak >= 10 ? "Incredible! You're on fire! 🔥" :
-                             streak >= 5 ? "Amazing! Keep it up! 💪" :
-                             "Great job! Keep going! ✨"}
-                          </div>
-                        </div>
-                        <span className="text-2xl">🎉</span>
+                      <div className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg ${feedback.ok ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'}`}>
+                        {feedback.ok ? '✅ Correct!' : '❌ Incorrect'}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="mt-20 flex justify-end gap-2">
+                <div className="mt-4 flex justify-end gap-2">
                   <button className="btn btn-ghost" onClick={() => setQIdx(i => Math.max(0, i - 1))} disabled={qIdx === 0}>Prev question</button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setFeedback(null)
-                      setQIdx(i => {
-                        if (i + 1 < pageQuestions.length) return i + 1
-                        // Only advance if all questions answered
-                        const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
-                        
-                        // Check if this is the final question of the test
-                        const isLastQuestion = 
-                          (subject === 'english' && currentNum === 50) ||
-                          (subject === 'math' && currentNum === 45) ||
-                          (subject === 'reading' && currentNum === 36)
-                        
-                        // Debug completion status for reading
-                        if (subject === 'reading') {
-                          // console.log(`Reading completion check: currentNum=${currentNum}, isLastQuestion=${isLastQuestion}`)
-                        }
-                        
-                        // Check if we're on a page with "END OF TEST" text
-                        const hasEndOfTest = 
-                          (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
-                          (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
-                          (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
-                        
-                        // End test if we've reached the last question OR completed all questions on END OF TEST page
-                        if (allAnswered && (isLastQuestion || hasEndOfTest)) {
-                          console.log(`${subject.toUpperCase()} test completed - ${isLastQuestion ? 'reached last question' : 'completed all questions on END OF TEST page'}`)
-                          setTestCompleted(true)
+                                      <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setFeedback(null)
+                        setQIdx(i => {
+                          if (i + 1 < pageQuestions.length) return i + 1
+                          // Only advance if all questions answered
+                          const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
+                          
+                          // Check if this is the final question of the test
+                          const isLastQuestion = 
+                            (subject === 'english' && currentNum === 50) ||
+                            (subject === 'math' && currentNum === 45) ||
+                            (subject === 'reading' && currentNum === 36)
+                          
+                          // Debug completion status for reading
+                          if (subject === 'reading') {
+                            // console.log(`Reading completion check: currentNum=${currentNum}, isLastQuestion=${isLastQuestion}`)
+                          }
+                          
+                          // Check if we're on a page with "END OF TEST" text
+                          const hasEndOfTest = 
+                            (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
+                            (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
+                            (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
+                          
+                          // End test if we've reached the last question OR completed all questions on END OF TEST page
+                          if (allAnswered && (isLastQuestion || hasEndOfTest)) {
+                            console.log(`${subject.toUpperCase()} test completed - ${isLastQuestion ? 'reached last question' : 'completed all questions on END OF TEST page'}`)
+                            // Play level up sound for test completion
+                            const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
+                            levelUpAudio.play().catch(() => {})
+                            setShowCompletionCelebration(true)
+                            return i
+                          }
+                          
+                          // Otherwise, advance to next page if possible
+                          if (allAnswered && pdf && pageNum < pdf.numPages) {
+                            const nextPage = Math.min(pdf.numPages, pageNum + 1)
+                            console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
+                            setLastManualAdvance(nextPage)
+                            setPageNum(nextPage)
+                            return 0
+                          }
+                          
                           return i
-                        }
-                        
-                        // Otherwise, advance to next page if possible
-                        if (allAnswered && pdf && pageNum < pdf.numPages) {
-                          const nextPage = Math.min(pdf.numPages, pageNum + 1)
-                          console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
-                          setLastManualAdvance(nextPage)
-                          setPageNum(nextPage)
-                          return 0
-                        }
-                        
-                        return i
-                      })
-                    }}
-                    disabled={qIdx >= pageQuestions.length - 1 && !pageQuestions.every(q => answers[q.id] !== undefined)}
-                  >
+                        })
+                      }}
+                      disabled={(qIdx >= pageQuestions.length - 1 && !pageQuestions.every(q => answers[q.id] !== undefined)) || answers[current?.id] === undefined}
+                    >
                     {(() => {
                       const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
                       const isLastQuestion = 
@@ -984,7 +1021,7 @@ export default function PdfPractice() {
                         }
                         
                         if (qIdx >= pageQuestions.length - 1 && allAnswered && (isLastQuestion || hasEndOfTest)) {
-                        return 'Finish Test'
+                        return 'See Results'
                       }
                       return qIdx >= pageQuestions.length - 1 ? 'Next Page' : 'Next question'
                     })()}
@@ -1023,8 +1060,23 @@ export default function PdfPractice() {
         message={streak >= 3 ? `Amazing ${streak} in a row!` : 'Correct!'}
       />
       
+      <TestCompletionCelebration
+        show={showCompletionCelebration}
+        onComplete={() => {
+          setShowCompletionCelebration(false)
+          navigate(`/test-selection/${testId}`)
+        }}
+        onReview={() => {
+          setShowCompletionCelebration(false)
+          const answersParam = encodeURIComponent(JSON.stringify(answers))
+          navigate(`/test-review/${subject}?testId=${testId}&answers=${answersParam}`)
+        }}
+        subject={subject}
+        totalQuestions={allQuestions.length}
+        correctAnswers={allQuestions.filter(q => answers[q.id] === q.answerIndex).length}
+      />
 
-    </div>
+    </motion.div>
   )
 }
 

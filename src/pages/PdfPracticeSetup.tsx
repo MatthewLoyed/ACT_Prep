@@ -16,11 +16,11 @@ export default function PdfPracticeSetup() {
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-semibold mb-2">PDF Practice</h2>
-      <p className="text-slate-600 dark:text-slate-300 mb-6">View the official-style PDF on the left and answer on the right.</p>
+              <p className="text-secondary mb-6">View the official-style PDF on the left and answer on the right.</p>
 
       <div className="card p-5 space-y-4">
         <div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Subject</div>
+          <div className="text-sm text-secondary mb-1">Subject</div>
           <div className="flex flex-wrap gap-2">
             {subjects.map(s => (
               <button key={s.id} className={`btn btn-ghost ${subject === s.id ? 'ring-2 ring-sky-500' : ''}`} onClick={() => setSubject(s.id)}>
@@ -31,7 +31,7 @@ export default function PdfPracticeSetup() {
         </div>
 
         <label className="block">
-          <span className="text-sm text-slate-600 dark:text-slate-300">PDF URL (or relative path)</span>
+                      <span className="text-sm text-secondary">PDF URL (or relative path)</span>
           <input
             type="text"
             value={url}

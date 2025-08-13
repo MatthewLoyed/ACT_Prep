@@ -133,7 +133,12 @@ export default function TestSelection() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-4xl mx-auto"
+    >
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold">Choose a subject</h2>
         <p className="text-slate-600 dark:text-slate-400">Select which section of "{test.name}" you want to practice</p>
@@ -268,6 +273,6 @@ export default function TestSelection() {
           ← Back to Practice
         </button>
       </div>
-    </div>
+    </motion.div>
   )
 }

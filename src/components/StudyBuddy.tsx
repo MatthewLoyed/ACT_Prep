@@ -89,7 +89,7 @@ export default function StudyBuddy({ streak, isCorrect, showMessage, onMessageCo
                  repeat: Infinity,
                  ease: "easeInOut"
                }}
-                               className={`${persistent ? 'w-16 h-16' : 'w-20 h-20'} bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer hover:scale-110 transition-transform`}
+                               className={`${persistent ? 'w-16 h-16' : 'w-20 h-20'} bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer hover:scale-110 transition-transform`}
                onClick={() => {
                  if (persistent) {
                    setCurrentMessage("Keep going! You're doing great! 💪")
@@ -111,12 +111,12 @@ export default function StudyBuddy({ streak, isCorrect, showMessage, onMessageCo
                          {/* Speech Bubble */}
              {(currentMessage || persistent) && (
                <motion.div
-                 initial={{ opacity: 0, scale: 0.8 }}
-                 animate={{ opacity: 1, scale: 1 }}
+                 initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                 animate={{ opacity: 1, scale: 1, y: 0 }}
                  transition={{ delay: 0.2, duration: 0.3 }}
-                                   className="absolute bottom-full right-0 mb-2 bg-white dark:bg-slate-800 rounded-3xl px-4 py-3 shadow-xl border border-slate-200 dark:border-slate-700 max-w-xs"
+                 className="absolute bottom-full right-0 mb-3 bg-white dark:bg-slate-800 rounded-3xl px-6 py-2 shadow-xl border border-slate-200 dark:border-slate-700 max-w-sm min-w-[200px]"
                >
-                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-center">
                    {currentMessage || (persistent && streak === 0 ? "Ready to help you study! 📚" : "")}
                  </div>
                  

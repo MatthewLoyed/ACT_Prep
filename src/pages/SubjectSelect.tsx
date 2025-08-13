@@ -11,10 +11,10 @@ const subjects = [
 export default function SubjectSelect() {
   return (
     <div className="container">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold">Choose a subject</h2>
-        <p className="text-slate-600 dark:text-slate-400">Pick what you want to practice today</p>
-      </div>
+              <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold mb-2">Choose a subject</h2>
+          <p className="text-secondary text-lg">Pick what you want to practice today</p>
+        </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         {subjects.map((s, i) => (
           <motion.div

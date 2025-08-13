@@ -18,6 +18,8 @@ const EnglishPassageView = lazy(() => import('./pages/EnglishPassageView'))
 const PdfPageViewer = lazy(() => import('./pages/PdfPageViewer'))
 const PdfPractice = lazy(() => import('./pages/PdfPractice'))
 const PdfPracticeSetup = lazy(() => import('./pages/PdfPracticeSetup'))
+const TestReview = lazy(() => import('./pages/TestReview'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 function App() {
   const [darkMode, setDarkMode] = useState<boolean>(false)
@@ -59,16 +61,16 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-dvh bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-950 dark:via-teal-950 dark:to-cyan-950 transition-colors">
+      <div className="min-h-dvh">
         <motion.header 
-          className="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 backdrop-blur-lg shadow-lg"
+          className="sticky top-0 z-10 glass-card shadow-lg"
           initial={{ y: 0 }}
           animate={{ y: isNavVisible ? 0 : -100 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          <div className="max-w-7xl mx-auto px-9 py-5 flex items-center justify-between">
-            <Link to="/" className="group">
-              <span className="text-5xl font-black bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent tracking-tight hover:scale-105 transition-transform duration-200">
+                      <div className="max-w-7xl mx-auto px-9 py-3 flex items-center justify-between">
+                         <Link to="/" className="group">
+               <span className="text-5xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200">
                 TestPrep Pro
               </span>
             </Link>
@@ -130,6 +132,12 @@ function App() {
                 <Route path="/pdf-practice-setup" element={<PageFade>
                   <PdfPracticeSetup />
                 </PageFade>} />
+                <Route path="/test-review/:subject" element={<PageFade>
+                  <TestReview />
+                </PageFade>} />
+                <Route path="/settings" element={<PageFade>
+                  <Settings />
+                </PageFade>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AnimatePresence>
@@ -167,8 +175,8 @@ function Nav() {
         to={to}
         className={`hidden sm:inline-flex items-center rounded-xl px-9 py-4 text-xl font-bold transition-all duration-200 ${
           active 
-            ? 'brand-gradient text-white shadow-lg scale-105' 
-            : 'hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105 hover:shadow-md'
+            ? 'accent-gradient text-neutral font-extrabold shadow-lg scale-105' 
+            : 'text-white font-extrabold text-shadow-xl hover:bg-white/20 hover:scale-105 hover:shadow-md'
         }`}
       >
         {label}
@@ -176,11 +184,12 @@ function Nav() {
     )
   }
       return (
-      <nav className="flex items-center gap-6">
+      <nav className="flex items-center gap-6 ml-auto">
         {link('/', 'Home')}
         {link('/import', 'Import PDF')}
         {link('/practice', 'Practice')}
         {link('/history', 'History')}
+        {link('/settings', 'Settings')}
       </nav>
     )
 }

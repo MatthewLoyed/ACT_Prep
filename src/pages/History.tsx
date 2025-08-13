@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { listTestsFromSupabase } from '../lib/supabaseTestStore'
 import ProgressCircle from '../components/ProgressCircle'
 
@@ -93,25 +94,30 @@ export default function History() {
   }, 0)
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-5xl mx-auto"
+    >
       <h2 className="text-3xl font-bold mb-2">Progress & History</h2>
-      <p className="text-slate-600 dark:text-slate-300 mb-6">Stay encouraged — progress compounds.</p>
+              <p className="text-secondary mb-6">Stay encouraged — progress compounds.</p>
 
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="card p-5">
-                <div className="text-sm text-slate-600 dark:text-slate-400">Overall ACT® (est.)</div>
+                <div className="text-sm text-secondary">Overall ACT® (est.)</div>
                 <div className="text-4xl font-bold">{overallAct} / 36</div>
               </div>
               <div className="card p-5">
-                <div className="text-sm text-slate-600 dark:text-slate-400">Questions practiced</div>
+                <div className="text-sm text-secondary">Questions practiced</div>
                 <div className="text-4xl font-bold">{overallTotal}</div>
               </div>
               <div className="card p-5">
-                <div className="text-sm text-slate-600 dark:text-slate-400">Tests imported</div>
+                <div className="text-sm text-secondary">Tests imported</div>
                 <div className="text-4xl font-bold">{tests.length}</div>
               </div>
               <div className="card p-5">
-                <div className="text-sm text-slate-600 dark:text-slate-400">Total questions available</div>
+                <div className="text-sm text-secondary">Total questions available</div>
                 <div className="text-4xl font-bold">{totalImportedQuestions}</div>
               </div>
             </div>
@@ -154,11 +160,11 @@ export default function History() {
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Total practice time</div>
+          <div className="text-sm text-secondary">Total practice time</div>
           <div className="text-4xl font-bold">{Math.round(overallTime / 60)} min</div>
         </div>
         <div className="card p-5">
-          <div className="text-sm text-slate-600 dark:text-slate-400">Average per session</div>
+          <div className="text-sm text-secondary">Average per session</div>
           <div className="text-4xl font-bold">{sessions.length > 0 ? Math.round(overallTime / sessions.length / 60) : 0} min</div>
         </div>
       </div>
@@ -167,7 +173,7 @@ export default function History() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-semibold">Your goal</h3>
-            <p className="text-slate-600 dark:text-slate-400">Aim high and track your momentum.</p>
+            <p className="text-secondary">Aim high and track your momentum.</p>
           </div>
           <div className="flex items-center gap-2">
             <input type="number" min={1} max={36} value={goal} onChange={e => setGoal(Number(e.target.value))} className="w-20 rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900" />
@@ -178,7 +184,7 @@ export default function History() {
           <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800/70 overflow-hidden">
             <div className="h-full brand-gradient" style={{ width: `${Math.min(100, (overallAct / goal) * 100)}%` }} />
           </div>
-          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">Estimated ACT® vs goal</div>
+                      <div className="mt-1 text-sm text-secondary">Estimated ACT® vs goal</div>
         </div>
       </div>
 
@@ -192,8 +198,8 @@ export default function History() {
                 <h3 className="text-lg font-semibold capitalize">{k}</h3>
                 <div className="rounded-xl px-3 py-1 bg-slate-100 dark:bg-slate-800">{act} / 36</div>
               </div>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{addTip(k)}</p>
-              <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">Practiced: {t.total} questions • {Math.round(t.time / 60)} min</div>
+              <p className="mt-2 text-sm text-secondary">{addTip(k)}</p>
+                              <div className="mt-3 text-sm text-secondary">Practiced: {t.total} questions • {Math.round(t.time / 60)} min</div>
             </div>
           )
         })}
@@ -203,9 +209,9 @@ export default function History() {
         <h3 className="text-xl font-semibold">Imported Tests</h3>
         <div className="mt-2">
           {loading ? (
-            <div className="py-4 text-slate-600 dark:text-slate-400">Loading tests...</div>
+            <div className="py-4 text-secondary">Loading tests...</div>
           ) : tests.length === 0 ? (
-            <div className="py-4 text-slate-600 dark:text-slate-400">No tests imported yet. Import a test to get started!</div>
+                          <div className="py-4 text-secondary">No tests imported yet. Import a test to get started!</div>
           ) : (
             <div className="space-y-3">
               {tests.map((test) => {
@@ -216,11 +222,11 @@ export default function History() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-semibold">{test.name}</h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                        <p className="text-sm text-secondary">
                           {totalQuestions} questions • {sections.join(', ')} sections
                         </p>
                       </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                                              <div className="text-sm text-secondary">
                         {new Date(test.createdAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -236,19 +242,19 @@ export default function History() {
         <h3 className="text-xl font-semibold">Recent sessions</h3>
         <div className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
           {sessions.length === 0 && (
-            <div className="py-4 text-slate-600 dark:text-slate-400">No practice sessions yet. Start a subject or a full test — small steps build big results!</div>
+            <div className="py-4 text-secondary">No practice sessions yet. Start a subject or a full test — small steps build big results!</div>
           )}
           {sessions.map((s, i) => (
             <div key={i} className="py-3 flex items-center justify-between text-sm">
               <div className="capitalize">{s.section}</div>
-              <div className="text-slate-600 dark:text-slate-400">{new Date(s.date).toLocaleString()}</div>
+              <div className="text-secondary">{new Date(s.date).toLocaleString()}</div>
               <div>{s.rawScore}/{s.total}</div>
               <div>{Math.round(s.durationSec/60)} min</div>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

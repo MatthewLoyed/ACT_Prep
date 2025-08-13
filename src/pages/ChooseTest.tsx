@@ -27,7 +27,7 @@ export default function ChooseTest() {
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-semibold mb-2">Choose a test</h2>
-      <p className="text-slate-600 dark:text-slate-300 mb-4">Select which imported test to use for practice.</p>
+              <p className="text-secondary mb-4">Select which imported test to use for practice.</p>
       <div className="space-y-3">
         {loading ? (
           <div className="card p-4">Loading tests...</div>
@@ -47,7 +47,7 @@ export default function ChooseTest() {
               >
                 <div className="text-left">
                   <div className="font-semibold">{t.name}</div>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">{new Date(t.createdAt).toLocaleString()}</div>
+                  <div className="text-sm text-secondary">{new Date(t.createdAt).toLocaleString()}</div>
                 </div>
                 <div className={`ml-4 size-3 rounded-full ${active === t.id ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`} />
               </button>
