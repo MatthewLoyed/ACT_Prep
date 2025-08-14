@@ -11,6 +11,8 @@ export interface TestRecord {
   name: string
   created_at: string
   sections: Record<string, any[]>
+  section_pages?: Record<string, number> // Store page numbers for each section
+  page_questions?: Record<string, Record<number, string[]>> // Store which questions are on which pages
   pdf_path?: string
   user_id?: string
 }

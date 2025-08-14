@@ -29,7 +29,6 @@ export default function TestCompletionCelebration({
   correctAnswers,
   timeSpent
 }: TestCompletionCelebrationProps) {
-  console.log('TestCompletionCelebration props:', { show, subject, totalQuestions, correctAnswers })
   const [showConfetti, setShowConfetti] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showActions, setShowActions] = useState(false)

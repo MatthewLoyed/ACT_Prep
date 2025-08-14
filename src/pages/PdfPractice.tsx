@@ -6,6 +6,7 @@ import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-d
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import { loadTestFromSupabase } from '../lib/supabaseTestStore'
 import type { TestBundle } from '../lib/testStore'
+import { cleanMathText } from '../lib/actParser'
 
 // Define types locally
 type SectionId = 'english' | 'math' | 'reading' | 'science'
@@ -96,7 +97,7 @@ export default function PdfPractice() {
     return questions
   }, [active, subject])
 
-  const [pageQuestionNums, setPageQuestionNums] = useState<number[]>([])
+
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [correctAudio] = useState(() => new Audio('/sounds/correct_answer.mp3'))
   const [wrongAudio] = useState(() => new Audio('/sounds/wrong_answer.wav'))
@@ -115,13 +116,12 @@ export default function PdfPractice() {
   // Reset all state when subject changes to prevent data corruption
   useEffect(() => {
     // console.log(`Subject changed to: ${subject} - Resetting all state`)
-    setPageQuestionNums([])
+
     setAnswers({})
     setFeedback(null)
     setQIdx(0)
     setTestCompleted(false)
     setLastManualAdvance(null)
-    setLastAutoSkip(null)
     setCurrentPageText('')
     setStreak(0) // Reset streak when changing subjects
     setShowStreakMessage(false) // Hide any existing streak message
@@ -188,172 +188,63 @@ export default function PdfPractice() {
 
   // Jump to first real question page on load
   useEffect(() => {
-    if (!pdf) return
+    if (!pdf || !active) return
     let mounted = true
     setIsPageDetectionRunning(true)
+    
     ;(async () => {
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i)
-        const content = await page.getTextContent()
-        type PDFTextItem = { str: string }
-        const text = (content.items as PDFTextItem[]).map((it) => it.str).join('\n')
-        
-        // Check for section headers
-        const isEnglishSection = /ENGLISH TEST\s+35\s+Minutes—50\s+Questions/i.test(text)
-        const isMathSection = /MATHEMATICS TEST\s+50\s+Minutes—45\s+Questions/i.test(text)
-        const isReadingSection = /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
-        
-        // Page detection debug removed - issue fixed
-        
-        if ((isEnglishSection || isMathSection || isReadingSection) && subject) {
-          const sectionMatch = 
-            (isEnglishSection && subject === 'english') ||
-            (isMathSection && subject === 'math') ||
-            (isReadingSection && subject === 'reading')
-          
-          // Section match debug removed - issue fixed
-          
-          if (sectionMatch) {
-            // For reading, start on the section header page (even if no questions)
-            if (subject === 'reading') {
-              // Reading page detection debug removed - issue fixed
-                              if (mounted) {
-                  setPageNum(i)
-                  // Set a flag to prevent auto-skip from overriding this page
-                  setLastManualAdvance(i)
-                  setIsPageDetectionRunning(false)
-                }
-                break
-            } else {
-              // For other sections, look for actual questions with answer choices
-              const hasQuestions = /\d{1,2}[.)]\s+[^]*?[A-DFGHJ][.)]\s+/.test(text)
-              
-              if (hasQuestions) {
-                // Section page detection debug removed - issue fixed
-                if (mounted) {
-                  setPageNum(i)
-                  // Set a flag to prevent auto-skip from overriding this page
-                  setLastManualAdvance(i)
-                  setIsPageDetectionRunning(false)
-                }
-                break
-              } else {
-                // No questions debug removed - issue fixed
-              }
-            }
+      // Check if we already have stored page numbers for this test
+      if (active.sectionPages && active.sectionPages[subject as SectionId]) {
+        const storedPage = active.sectionPages[subject as SectionId]
+        if (storedPage) {
+          console.log(`PDF DEBUG: Using stored page ${storedPage} for ${subject} section`)
+          if (mounted) {
+            setPageNum(storedPage)
+            setLastManualAdvance(storedPage)
+            setIsPageDetectionRunning(false)
           }
+          return
         }
       }
       
-      // If we get here, no page was found, so mark detection as complete
+      // If no stored pages, this is an error - section pages should be detected during import
+      console.error(`PDF DEBUG: No stored page for ${subject} - section pages should be detected during import`)
       if (mounted) {
-        // Page detection complete
+        setIsPageDetectionRunning(false)
+      }
+      return
+      
+      // Mark detection as complete
+      if (mounted) {
         setIsPageDetectionRunning(false)
       }
     })()
+    
     return () => { 
       mounted = false 
       setIsPageDetectionRunning(false)
     }
-  }, [pdf, subject])
+  }, [pdf, subject, active])
 
+  // Track current render task to prevent multiple simultaneous renders
+  const currentRenderTaskRef = useRef<{ cancel: () => void } | null>(null)
+  
   // Render page
-  const [lastAutoSkip, setLastAutoSkip] = useState<number | null>(null)
-
   useEffect(() => {
     if (!pdf || !canvasRef.current) return
+    
+    let mounted = true
+    
     ;(async () => {
       const page = await pdf.getPage(pageNum)
       const content = await page.getTextContent()
       type PDFTextItem = { str: string }
       const text = (content.items as PDFTextItem[]).map((it) => it.str).join('\n')
+      
+      if (!mounted) return
       setCurrentPageText(text)
       
-      // Enhanced question detection: look for numbers followed by answer choices
-      // Must have a period after the number (like 6.) and find answer choices before next question
-      // IMPORTANT: Questions cannot extend past page boundaries
-      // Use parentheses-aware pattern to prevent cutting inside parentheses
-      let questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
-      let nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 75)
       
-      // For reading, also try a more flexible pattern since questions might be shorter
-      if (subject === 'reading' && nums.length === 0) {
-        // console.log('No reading questions found with standard pattern, trying flexible pattern...')
-        questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
-        nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 36)
-        // console.log(`Reading flexible pattern found: ${nums.length} questions`)
-      }
-      
-      // Use all question matches without page boundary filtering
-      nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 75)
-      
-      // Debug for page 27 specifically
-      if (pageNum === 27) {
-        // console.log(`=== PAGE 27 DEBUG ===`)
-        // console.log(`Raw text preview:`, text.substring(0, 500))
-        // console.log(`All question matches:`, questionMatches.map(m => ({
-        //   num: m[1],
-        //   fullMatch: m[0].substring(0, 100),
-        //   index: m.index
-        // })))
-        // console.log(`Filtered numbers:`, nums)
-        
-        // Also try a broader search for any numbers that might be questions
-        // const allNumbers = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})[.)]/g))
-        // console.log(`All numbers found:`, allNumbers.map(m => ({
-        //   num: m[1],
-        //   context: text.substring(Math.max(0, m.index - 20), m.index + 50)
-        // })))
-      }
-      
-      // Debug for questions 22 and 44 specifically
-      if (nums.includes(22) || nums.includes(44)) {
-        // console.log(`=== QUESTIONS 22/44 DEBUG ===`)
-        // console.log(`Page ${pageNum} detected questions:`, nums)
-        // console.log(`Question 22 detected:`, nums.includes(22))
-        // console.log(`Question 44 detected:`, nums.includes(44))
-      }
-      
-      // Debug for reading questions specifically
-      if (subject === 'reading') {
-        // console.log(`=== READING QUESTIONS DEBUG ===`)
-        // console.log(`Page ${pageNum} detected reading questions:`, nums)
-        // console.log(`Question matches:`, questionMatches.map(m => ({
-        //   num: m[1],
-        //   fullMatch: m[0].substring(0, 100),
-        //   index: m.index
-        // })))
-        
-        // Show sample of detected questions
-        if (nums.length > 0) {
-          // console.log(`Sample reading questions on page ${pageNum}:`, nums.slice(0, 5))
-        }
-      }
-      
-      // Use all detected question numbers without consecutive filtering
-      const uniqueNums = [...new Set(nums)].sort((a, b) => a - b)
-      setPageQuestionNums(uniqueNums)
-      
-      // Auto-skip pages with no questions, but allow reading test start page
-      // Add a small delay to allow state updates from page detection to take effect
-      setTimeout(() => {
-        if (uniqueNums.length === 0 && pdf && pageNum < pdf.numPages && lastAutoSkip !== pageNum && lastManualAdvance !== pageNum && !isPageDetectionRunning) {
-          // Special case: don't auto-skip reading test start page even if no questions
-          const isReadingTestStart = subject === 'reading' && /READING TEST\s+40\s+Minutes—36\s+Questions/i.test(text)
-          
-          // Auto-skip debug removed - issue fixed
-          
-          if (!isReadingTestStart) {
-            // Auto-skip action debug removed - issue fixed
-            setLastAutoSkip(pageNum)
-            setTimeout(() => setPageNum(p => Math.min(pdf.numPages, p + 1)), 0)
-            return
-          } else {
-            // Reading test start debug removed - issue fixed
-          }
-        }
-      }, 50) // Small delay to allow state updates to take effect
-
       // Check for test ending - allow completion of questions on the final page
       const hasEndOfTest = 
         (subject === 'english' && /END OF TEST 1/i.test(text)) ||
@@ -362,16 +253,16 @@ export default function PdfPractice() {
       
       // Debug: log when we see "END OF TEST" 
       if (hasEndOfTest) {
-        // console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${uniqueNums.join(', ')}]`)
+        // console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${questionNumbers.join(', ')}]`)
       }
 
-      // Render debug removed - issue fixed
-      
-      // Clear manual advance flag after a delay to allow auto-skip on subsequent pages
+      // Clear manual advance flag after a delay
       if (lastManualAdvance === pageNum) {
         setTimeout(() => setLastManualAdvance(null), 100)
       }
       // Render PDF
+      if (!mounted) return
+      
       const natural = page.getViewport({ scale: 1 })
       let fitScale = 1
       if (leftPaneRef.current) {
@@ -380,16 +271,50 @@ export default function PdfPractice() {
       }
       const viewport = page.getViewport({ scale: fitScale * zoom })
       const canvas = canvasRef.current
-      if (!canvas) return
+      if (!canvas || !mounted) return
       const ctx = canvas.getContext('2d')
       if (!ctx) return
+      
+      // Cancel any previous render task
+      if (currentRenderTaskRef.current) {
+        currentRenderTaskRef.current.cancel()
+        currentRenderTaskRef.current = null
+      }
+      
       canvas.width = viewport.width
       canvas.height = viewport.height
-      await page.render({ canvasContext: ctx, viewport, canvas }).promise
-      canvas.style.width = '100%'
-      canvas.style.height = 'auto'
+      
+      // Only render if still mounted
+      if (mounted) {
+        try {
+          const renderTask = page.render({ canvasContext: ctx, viewport, canvas })
+          currentRenderTaskRef.current = renderTask
+          await renderTask.promise
+          
+          if (mounted) {
+            canvas.style.width = '100%'
+            canvas.style.height = 'auto'
+          }
+        } catch (error) {
+          // Ignore cancellation and abort errors - these are expected when navigating quickly
+          if (error && typeof error === 'object' && 'name' in error) {
+            const errorName = error.name as string
+            if (errorName !== 'AbortError' && errorName !== 'RenderingCancelledException') {
+              console.error('PDF render error:', error)
+            }
+          }
+        }
+      }
     })()
-  }, [pdf, pageNum, zoom, lastAutoSkip, lastManualAdvance, subject])
+    
+    return () => {
+      mounted = false
+      if (currentRenderTaskRef.current) {
+        currentRenderTaskRef.current.cancel()
+        currentRenderTaskRef.current = null
+      }
+    }
+  }, [pdf, pageNum, zoom, lastManualAdvance, subject])
 
   // Preload sounds
   useEffect(() => {
@@ -397,98 +322,15 @@ export default function PdfPractice() {
   }, [correctAudio, wrongAudio])
 
   const pageQuestions: Question[] = useMemo(() => {
-    if (!pageQuestionNums.length) return []
-    
-    // Filter questions by section - only use questions from the current subject
-    const sectionQuestions = allQuestions.filter(q => {
-      const sectionMatch = q.id.match(/^(english|math|reading)-/)
-      return sectionMatch && sectionMatch[1] === subject
-    })
-    
-    // Pre-create all question slots for consistent mapping
-    const questionSlots = new Map<number, Question>()
-    
-    // For Math, pre-create slots 1-45
-    if (subject === 'math') {
-      for (let i = 1; i <= 45; i++) {
-        questionSlots.set(i, {
-          id: `math-${i}`,
-          prompt: `Question ${i} (not loaded)`,
-          choices: ['', '', '', ''],
-          choiceLetters: ['A', 'B', 'C', 'D']
-        })
-      }
+    // Get questions for the current page using the stored pageQuestions mapping
+    const subjectPageQuestions = active?.pageQuestions?.[subject as SectionId]
+    if (subjectPageQuestions && subjectPageQuestions[pageNum]) {
+      const questionIds = subjectPageQuestions[pageNum]
+      return allQuestions.filter(q => questionIds.includes(q.id))
     }
-    // For English, pre-create slots 1-50
-    else if (subject === 'english') {
-      for (let i = 1; i <= 50; i++) {
-        questionSlots.set(i, {
-          id: `english-${i}`,
-          prompt: `Question ${i} (not loaded)`,
-          choices: ['', '', '', ''],
-          choiceLetters: ['A', 'B', 'C', 'D']
-        })
-      }
-    }
-                // For Reading, pre-create slots 1-36 (ACT® reading has 36 questions)
-    else if (subject === 'reading') {
-      for (let i = 1; i <= 36; i++) {
-        questionSlots.set(i, {
-          id: `reading-${i}`,
-          prompt: `Question ${i} (not loaded)`,
-          choices: ['', '', '', ''],
-          choiceLetters: ['A', 'B', 'C', 'D']
-        })
-      }
-    }
-    
-          // Fill in the actual questions from parsed data
-      for (const q of sectionQuestions) {
-        const m = q.id.match(/(\d+)/)
-        const num = m ? Number(m[1]) : -1
-        if (num > 0 && questionSlots.has(num)) {
-          questionSlots.set(num, q)
-          if (pageNum === 27) {
-            // console.log(`Mapped question ${num} to ${q.id}`)
-          }
-          
-          // Debug for reading questions
-          if (subject === 'reading' && (num === 1 || num === 10 || num === 20 || num === 30)) {
-            // console.log(`Reading question ${num} mapped:`, {
-            //   id: q.id,
-            //   prompt: q.prompt.substring(0, 100) + '...',
-            //   choices: q.choices,
-            //   answerIndex: q.answerIndex
-            // })
-          }
-        }
-      }
-    
-    // Get questions for this page
-    const ordered = pageQuestionNums.map(n => questionSlots.get(n)).filter(Boolean) as Question[]
-    
-   
-    
-    // console.log(`Page ${pageNum}: ${subject} questions [${ordered.map(q => q.id).join(', ')}]`)
-    
-    // Debug: show question details for Math
-    if (subject === 'math' && ordered.length > 0) {
-      // console.log(`${subject} questions on page ${pageNum}:`)
-      // ordered.forEach(q => {
-      //   console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
-      // })
-    }
-    
-    // Debug: show question details for Math
-    if (subject === 'math' && ordered.length > 0) {
-      // console.log(`${subject} questions on page ${pageNum}:`)
-      // ordered.forEach(q => {
-      //   console.log(`  ${q.id}: "${q.prompt.substring(0, 50)}..."`)
-      // })
-    }
-    
-    return ordered
-  }, [pageQuestionNums, allQuestions, pageNum, subject])
+    // Fallback: return all questions if no page mapping is available
+    return allQuestions
+  }, [allQuestions, active?.pageQuestions, subject, pageNum])
 
   // Reset question index when page changes
   useEffect(() => { setQIdx(0) }, [pageNum])
@@ -500,50 +342,12 @@ export default function PdfPractice() {
     setQIdx(0)
     setTestCompleted(false)
     setLastManualAdvance(null)
-    setLastAutoSkip(null)
     setStreak(0) // Reset streak when switching sections
     setShowStreakMessage(false) // Hide any existing streak message
     console.log(`Switched to ${subject} section - cleared previous test data`)
   }, [subject])
 
-  // Clean up math symbols for better display
-  const cleanMathText = useCallback((text: string): string => {
-    return text
-      // Remove page artifacts and unwanted text
-      .replace(/DO YOUR FIGURING HERE\.?\s*\d*\s*\d*/gi, '')
-      .replace(/GO ON TO THE NEXT PAGE\.?/gi, '')
-      .replace(/©\s?\d{4,}\s+by ACT[\s\S]*?(?=\n|$)/gi, '')
-      .replace(/Page\s+\d+\s+of\s+\d+/gi, '')
-      .replace(/QU[0-9A-Z.-]+/g, '')
-      // Remove test ending text that might contaminate choices
-      .replace(/END OF TEST\s*\d+\.?/gi, '')
-      .replace(/END OF TEST\s*\d+\.?\s*$/gi, '')
-      // Fix pi symbols: "7200 _ pi_symbol" → "7200π"
-      .replace(/(\d+)\s*_\s*pi_symbol/g, '$1π')
-      .replace(/pi_symbol/g, 'π')
-      // Fix all square root patterns: "√ _ 143" → "√143", "√ _ -16" → "√-16"
-      .replace(/√\s*_\s*(-?\d+)/g, '√$1')
-      // Fix "12 _ √ 194" → "12 / √194"
-      .replace(/(\d+)\s*_\s*√\s*(\d+)/g, '$1 / √$2')
-      // Fix fractions: "6 _ 5" → "6/5"
-      .replace(/(\d+)\s*_\s*(\d+)/g, '$1/$2')
-      // Fix exponents: "t 2" → "t^2" (only for standalone letters, not words)
-      .replace(/(?<=\s|^)([a-zA-Z])\s+(\d+)(?=\s|$|[^\w])/g, (_, letter, num) => {
-        // Don't add ^ if the letter is part of a word (like "at", "a", "an", "the")
-        const commonWords = ['at', 'a', 'an', 'the', 'in', 'on', 'of', 'to', 'by', 'for', 'with', 'from']
-        if (commonWords.includes(letter.toLowerCase())) {
-          return `${letter} ${num}`
-        }
-        return `${letter}^${num}`
-      })
-      // Fix negative signs: "- 4.9" → "-4.9"
-      .replace(/-\\s+(\\d+\\.?\\d*)/g, '-$1')
-      // Add line breaks between equations in systems
-      .replace(/(\d+\s*[a-zA-Z]\s*[+\-*/=]\s*[a-zA-Z]\s*=\s*\d+)\s+(-\s*\d+\s*[a-zA-Z]\s*[+\-*/=]\s*[a-zA-Z]\s*=\s*\d+)/g, '$1\n$2')
-      // Clean up extra spaces around operators
-      .replace(/\s*([+\-*/=])\s*/g, ' $1 ')
-      .trim()
-  }, [])
+
 
   const onAnswer = useCallback((qid: string, idx: number, correctIdx?: number) => {
     setAnswers(prev => ({ ...prev, [qid]: idx }))
@@ -764,7 +568,7 @@ export default function PdfPractice() {
                 </div>
               )}
               {/* Debug info - commented out
-              <div className="mt-2 text-xs opacity-60">Detected: [{pageQuestionNums.join(', ')}]</div>
+      
               <div className="mt-2 text-xs opacity-60">Current: Question {currentNum} of {pageQuestions.length}</div>
               <div className="mt-2 text-xs opacity-60">Subject: {subject}</div>
               {subject === 'math' && (
@@ -901,10 +705,6 @@ export default function PdfPractice() {
                   })}
                 </div>
 
-
-
-
-
                 {/* Streak Celebration Message */}
                 <div className="relative h-20">
                   <AnimatePresence>
@@ -959,20 +759,19 @@ export default function PdfPractice() {
                       onClick={() => {
                         setFeedback(null)
                         setQIdx(i => {
-                          if (i + 1 < pageQuestions.length) return i + 1
-                          // Only advance if all questions answered
+                          // Check if all questions on current page are answered
                           const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
                           
-                          // Check if this is the final question of the test
+                          // If not all answered, go to next question on same page
+                          if (!allAnswered && i + 1 < pageQuestions.length) {
+                            return i + 1
+                          }
+                          
+                          // If all answered, check if this is the final question of the test
                           const isLastQuestion = 
                             (subject === 'english' && currentNum === 50) ||
                             (subject === 'math' && currentNum === 45) ||
                             (subject === 'reading' && currentNum === 36)
-                          
-                          // Debug completion status for reading
-                          if (subject === 'reading') {
-                            // console.log(`Reading completion check: currentNum=${currentNum}, isLastQuestion=${isLastQuestion}`)
-                          }
                           
                           // Check if we're on a page with "END OF TEST" text
                           const hasEndOfTest = 
@@ -990,19 +789,31 @@ export default function PdfPractice() {
                             return i
                           }
                           
-                          // Otherwise, advance to next page if possible
+                          // Otherwise, advance to next page if all questions are answered
                           if (allAnswered && pdf && pageNum < pdf.numPages) {
-                            const nextPage = Math.min(pdf.numPages, pageNum + 1)
-                            console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
-                            setLastManualAdvance(nextPage)
-                            setPageNum(nextPage)
-                            return 0
+                            // Find the next page that has questions for this subject
+                            let nextPage = pageNum + 1
+                            while (nextPage <= pdf.numPages) {
+                              const subjectPageQuestions = active?.pageQuestions?.[subject as SectionId]
+                              if (subjectPageQuestions?.[nextPage] && 
+                                  subjectPageQuestions[nextPage].length > 0) {
+                                break
+                              }
+                              nextPage++
+                            }
+                            
+                            if (nextPage <= pdf.numPages) {
+                              console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
+                              setLastManualAdvance(nextPage)
+                              setPageNum(nextPage)
+                              return 0
+                            }
                           }
                           
                           return i
                         })
                       }}
-                      disabled={(qIdx >= pageQuestions.length - 1 && !pageQuestions.every(q => answers[q.id] !== undefined)) || answers[current?.id] === undefined}
+                      disabled={answers[current?.id] === undefined}
                     >
                     {(() => {
                       const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
@@ -1010,20 +821,23 @@ export default function PdfPractice() {
                         (subject === 'english' && currentNum === 50) ||
                         (subject === 'math' && currentNum === 45) ||
                         (subject === 'reading' && currentNum === 36)
-                                              const hasEndOfTest = 
-                          (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
-                          (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
-                          (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
-                        
-                        // Debug button text for reading
-                        if (subject === 'reading') {
-                          // console.log(`Reading button text check: qIdx=${qIdx}, pageQuestions.length=${pageQuestions.length}, allAnswered=${allAnswered}, isLastQuestion=${isLastQuestion}, hasEndOfTest=${hasEndOfTest}`)
-                        }
-                        
-                        if (qIdx >= pageQuestions.length - 1 && allAnswered && (isLastQuestion || hasEndOfTest)) {
+                      const hasEndOfTest = 
+                        (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
+                        (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
+                        (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
+                      
+                      // Check if this is the final question of the test
+                      if (allAnswered && (isLastQuestion || hasEndOfTest)) {
                         return 'See Results'
                       }
-                      return qIdx >= pageQuestions.length - 1 ? 'Next Page' : 'Next question'
+                      
+                      // Check if all questions on current page are answered
+                      if (allAnswered) {
+                        return 'Next Page'
+                      }
+                      
+                      // Otherwise show "Next question"
+                      return 'Next question'
                     })()}
                   </button>
                 </div>

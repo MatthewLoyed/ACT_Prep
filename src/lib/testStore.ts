@@ -7,6 +7,8 @@ export type TestBundle = {
   createdAt: string
   sections: Partial<Record<SectionId, unknown[]>>
   pdfData?: string // Base64 encoded PDF data
+  sectionPages?: Partial<Record<SectionId, number>> // Store the page number where each section starts
+  pageQuestions?: Partial<Record<SectionId, Record<number, string[]>>> // Store which questions are on which pages
 }
 
 const TESTS_KEY = 'tests'

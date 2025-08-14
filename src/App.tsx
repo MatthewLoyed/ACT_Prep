@@ -20,6 +20,7 @@ const PdfPractice = lazy(() => import('./pages/PdfPractice'))
 const PdfPracticeSetup = lazy(() => import('./pages/PdfPracticeSetup'))
 const TestReview = lazy(() => import('./pages/TestReview'))
 const Settings = lazy(() => import('./pages/Settings'))
+const Tips = lazy(() => import('./pages/Tips'))
 
 function App() {
   const [darkMode, setDarkMode] = useState<boolean>(false)
@@ -68,9 +69,9 @@ function App() {
           animate={{ y: isNavVisible ? 0 : -100 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-                      <div className="max-w-7xl mx-auto px-9 py-3 flex items-center justify-between">
+                      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
                          <Link to="/" className="group">
-               <span className="text-5xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200">
+               <span className="text-4xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200 whitespace-nowrap">
                 TestPrep Pro
               </span>
             </Link>
@@ -138,6 +139,9 @@ function App() {
                 <Route path="/settings" element={<PageFade>
                   <Settings />
                 </PageFade>} />
+                <Route path="/tips" element={<PageFade>
+                  <Tips />
+                </PageFade>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AnimatePresence>
@@ -186,8 +190,9 @@ function Nav() {
       return (
       <nav className="flex items-center gap-6 ml-auto">
         {link('/', 'Home')}
-        {link('/import', 'Import PDF')}
+        {link('/import', 'Import')}
         {link('/practice', 'Practice')}
+        {link('/tips', 'Tips')}
         {link('/history', 'History')}
         {link('/settings', 'Settings')}
       </nav>

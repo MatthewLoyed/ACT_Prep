@@ -124,14 +124,29 @@ export default function Practice() {
                         {new Date(test.createdAt).toLocaleString()}
                       </div>
                       <div className="flex gap-2 mt-1">
-                        {Object.entries(test.sections).map(([section, questions]) => (
-                          <span 
-                            key={section}
-                            className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs"
-                          >
-                            {section}: {(questions as unknown[]).length}
-                          </span>
-                        ))}
+                        {(() => {
+                          // Define the desired order
+                          const desiredOrder = ['english', 'math', 'reading', 'science']
+                          
+                          // Debug: log the sections data
+                          console.log(`Practice Debug: Test "${test.name}" sections:`, test.sections)
+                          
+                          // Filter and sort sections in the desired order
+                          return desiredOrder
+                            .filter(section => test.sections[section])
+                            .map(section => {
+                              const sectionData = test.sections[section]
+                              console.log(`Practice Debug: ${section} section data:`, sectionData, 'Type:', typeof sectionData, 'Length:', Array.isArray(sectionData) ? sectionData.length : 'Not an array')
+                              return (
+                                <span 
+                                  key={section}
+                                  className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs"
+                                >
+                                  {section}: {(test.sections[section] as unknown[]).length}
+                                </span>
+                              )
+                            })
+                        })()}
                       </div>
                     </div>
                   </div>

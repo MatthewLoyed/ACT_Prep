@@ -9,6 +9,8 @@ type TestBundle = {
   createdAt: string
   sections: Partial<Record<SectionId, unknown[]>>
   pdfData?: string // Base64 encoded PDF data
+  sectionPages?: Partial<Record<SectionId, number>> // Store the page number where each section starts
+  pageQuestions?: Partial<Record<SectionId, Record<number, string[]>>> // Store which questions are on which pages
 }
 
 const ACTIVE_TEST_KEY = 'activeTestId'
@@ -40,10 +42,13 @@ export async function saveTestToSupabase(bundle: Omit<TestBundle, 'id' | 'create
     }
     
     // 2. Save test metadata to database
+    console.log(`Supabase Debug: Saving test "${bundle.name}" with sections:`, bundle.sections)
     const testRecord: Omit<TestRecord, 'id'> = {
       name: bundle.name,
       created_at: now,
       sections: bundle.sections,
+      section_pages: bundle.sectionPages, // Store section pages in database
+      page_questions: bundle.pageQuestions, // Store page questions mapping in database
       pdf_path: pdfPath
     }
     
@@ -116,6 +121,8 @@ export async function loadTestFromSupabase(id: string): Promise<TestBundle | nul
       id: testRecord.id,
       name: testRecord.name,
       sections: testRecord.sections,
+      sectionPages: testRecord.section_pages || undefined, // Load section pages from database (if column exists)
+      pageQuestions: testRecord.page_questions || undefined, // Load page questions mapping from database
       pdfData,
       createdAt: testRecord.created_at
     }
@@ -141,13 +148,16 @@ export async function listTestsFromSupabase(): Promise<TestBundle[]> {
     }
     
     // Convert to TestBundle format (without PDF data for list view)
-    const tests: TestBundle[] = testRecords.map(record => ({
-      id: record.id,
-      name: record.name,
-      sections: record.sections,
-      pdfData: undefined, // Don't load PDF data in list view
-      createdAt: record.created_at
-    }))
+    const tests: TestBundle[] = testRecords.map(record => {
+      console.log(`Supabase Debug: Test "${record.name}" sections from DB:`, record.sections)
+      return {
+        id: record.id,
+        name: record.name,
+        sections: record.sections,
+        pdfData: undefined, // Don't load PDF data in list view
+        createdAt: record.created_at
+      }
+    })
     
     return tests
     
@@ -262,6 +272,25 @@ export function clearTests(): void {
 export function getNextDefaultName(): string {
   // This will need to be updated to work with Supabase
   return `Practice Test #${Date.now()}`
+}
+
+export async function updateTestSectionPages(id: string, sectionPages: Partial<Record<SectionId, number>>): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('tests')
+      .update({ section_pages: sectionPages })
+      .eq('id', id)
+    
+    if (error) {
+      console.error('Failed to update section pages:', error)
+      throw new Error(`Failed to update section pages: ${error.message}`)
+    }
+    
+    console.log('Section pages updated successfully in Supabase')
+  } catch (error) {
+    console.error('Update section pages failed:', error)
+    throw error
+  }
 }
 
 export async function clearAllTestsFromSupabase(): Promise<void> {
