@@ -148,6 +148,8 @@ function cloneQuestions(questions: Extracted['questions']): Extracted['questions
   return questions.map(q => ({ ...q }))
 }
 
+
+
 function extractEnglish(englishText: string): Extracted {
   const text = englishText
     .replace(/GO ON TO THE NEXT PAGE\.?/gi, ' ')
@@ -168,7 +170,7 @@ function extractEnglish(englishText: string): Extracted {
   const validatedNums: number[] = []
   for (const match of questionMatches) {
     const questionNum = Number(match[1])
-    if (questionNum >= 1 && questionNum <= 75) {
+    if (questionNum >= 1 && questionNum <= 50) {
       const matchIndex = match.index!
       const textAfterMatch = text.slice(matchIndex, matchIndex + 500) // Look 500 chars ahead
       

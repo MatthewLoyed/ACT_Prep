@@ -25,7 +25,10 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
   const sectionPages = await detectSectionPages(pdf)
   console.log('Old ACT Parser: Detected section pages:', sectionPages)
 
+  // Create page text mapping for accessing text from specific pages
+  const pageTextMap: Record<number, string> = {}
   const pages: string[] = []
+  
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const content = await page.getTextContent()
@@ -33,31 +36,78 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
     const text = (content.items as PDFTextItem[])
       .map((it) => it.str)
       .join('\n')
+    pageTextMap[i] = text  // Store text mapped to page number
     pages.push(text)
   }
 
   const combined = pages.join('\n')
+  
+
   const sections: Extracted[] = []
   
   // Improved section slicing with better boundaries
-  const englishText = sliceBetween(combined, /ENGLISH TEST\s+45\s+Minutes—75\s+Questions/i, /(MATH|MATHEMATICS) TEST/i)
-  const mathText = sliceBetween(combined, /(MATH|MATHEMATICS) TEST\s+60\s+Minutes—60\s+Questions/i, /READING TEST/i)
-  const readingText = sliceBetween(combined, /READING TEST\s+35\s+Minutes—40\s+Questions/i, /SCIENCE TEST/i)
+  // Use "DO NOT OPEN THIS BOOKLET" as start marker for English section
+  let englishText = sliceBetween(combined, /DO\s+NOT\s+OPEN\s+THIS\s+BOOKLET\s+UNTIL\s+TOLD\s+TO\s+DO\s+SO\./i, /END\s+OF\s+TEST\s+1/i)
+  if (!englishText) {
+    // Fallback: try Math section header patterns
+    englishText = sliceBetween(combined, /DO\s+NOT\s+OPEN\s+THIS\s+BOOKLET\s+UNTIL\s+TOLD\s+TO\s+DO\s+SO\./i, /(MATH|MATHEMATICS)\s+TEST/i)
+  }
+  if (!englishText) {
+    // Fallback: try different Math section header formats
+    englishText = sliceBetween(combined, /DO\s+NOT\s+OPEN\s+THIS\s+BOOKLET\s+UNTIL\s+TOLD\s+TO\s+DO\s+SO\./i, /MATH\s+TEST/i)
+  }
+  if (!englishText) {
+    // Fallback: try even more flexible pattern
+    englishText = sliceBetween(combined, /DO\s+NOT\s+OPEN\s+THIS\s+BOOKLET\s+UNTIL\s+TOLD\s+TO\s+DO\s+SO\./i, /MATHEMATICS\s+TEST/i)
+  }
+  
+  // Use "END OF TEST" boundaries for Math and Reading sections
+  let mathText = sliceBetween(combined, /(MATH|MATHEMATICS)\s+TEST\s+60\s+Minutes—60\s+Questions/i, /END\s+OF\s+TEST\s+2/i)
+  if (!mathText) {
+    // Fallback: try Reading section header
+    mathText = sliceBetween(combined, /(MATH|MATHEMATICS)\s+TEST\s+60\s+Minutes—60\s+Questions/i, /READING\s+TEST/i)
+  }
+  
+  let readingText = sliceBetween(combined, /READING\s+TEST\s+35\s+Minutes—40\s+Questions/i, /END\s+OF\s+TEST\s+3/i)
+  if (!readingText) {
+    // Fallback: try Science section header
+    readingText = sliceBetween(combined, /READING\s+TEST\s+35\s+Minutes—40\s+Questions/i, /SCIENCE\s+TEST/i)
+  }
 
-  const english: Extracted = englishText
-    ? extractEnglish(englishText)
-    : { section: 'english', questions: [] as Extracted['questions'] }
+ 
+
+  // Extract English questions using page-based approach
+  const english: Extracted = extractEnglishFromPages(pageTextMap, sectionPages.english || 13)
   if (english.questions.length) sections.push(english)
 
-  const math = mathText 
-    ? extractMath(mathText) 
-    : { section: 'math' as const, questions: [] as Extracted['questions'] }
+  // Extract Math questions using page-based approach
+  const math: Extracted = extractMathFromPages(pageTextMap, sectionPages.math || 25)
   if (math.questions.length) sections.push(math)
   
-  const reading = readingText 
-    ? extractReading(readingText) 
-    : { section: 'reading' as const, questions: [] as Extracted['questions'] }
+  // Debug: Show full text of first Math page
+  const mathStartPage = sectionPages.math || 25
+  console.log('🔍 DEBUG MATH FIRST PAGE:')
+  console.log('Math test starts on page:', mathStartPage)
+  console.log('=== FIRST MATH PAGE CONTENT START ===')
+  console.log(pageTextMap[mathStartPage] || 'Math start page not found')
+  console.log('=== FIRST MATH PAGE CONTENT END ===')
+  
+  // Extract Reading questions using page-based approach
+  const reading: Extracted = extractReadingFromPages(pageTextMap, sectionPages.reading || 33)
   if (reading.questions.length) sections.push(reading)
+
+  // DEBUG: Check extracted questions by section
+  console.log('🔍 DEBUG EXTRACTED QUESTIONS:')
+  console.log('English questions found:', english.questions.length)
+  console.log('Math questions found:', math.questions.length)
+  console.log('Reading questions found:', reading.questions.length)
+  
+  if (math.questions.length > 0) {
+    console.log('First 3 Math questions:')
+    math.questions.slice(0, 3).forEach((q, i) => {
+      console.log(`  Math ${i+1}: ID=${q.id}, Prompt="${q.prompt.substring(0, 50)}...", Choices=${q.choiceLetters?.join(',') || 'none'}`)
+    })
+  }
 
   // Extract and assign answer keys for each section separately
   const sectionMap: Record<string, Extracted> = {}
@@ -68,7 +118,7 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
     
     // Map questions to pages
     const englishStartPage = sectionPages.english || 1
-    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, englishClone.questions, englishStartPage)
+    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, englishClone.questions, englishStartPage, 'english')
     englishClone.questions = questionsWithPages
     englishClone.pageQuestions = pageQuestions
     
@@ -92,7 +142,7 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
     
     // Map questions to pages
     const mathStartPage = sectionPages.math || 1
-    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, mathClone.questions, mathStartPage)
+    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, mathClone.questions, mathStartPage, 'math')
     mathClone.questions = questionsWithPages
     mathClone.pageQuestions = pageQuestions
     
@@ -116,7 +166,7 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
     
     // Map questions to pages
     const readingStartPage = sectionPages.reading || 1
-    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, readingClone.questions, readingStartPage)
+    const { questionsWithPages, pageQuestions } = await mapQuestionsToPages(pdf, readingClone.questions, readingStartPage, 'reading')
     readingClone.questions = questionsWithPages
     readingClone.pageQuestions = pageQuestions
     
@@ -134,11 +184,18 @@ export async function parseOldActPdf(file: File): Promise<Extracted[]> {
     }
   }
 
-  // Add section pages to each section
-  const sectionsWithPages = Object.values(sectionMap).map(section => ({
-    ...section,
-    sectionPages
-  }))
+  // Add section pages to each section in correct order
+  const sectionsWithPages = []
+  if (sectionMap.english) {
+    sectionsWithPages.push({ ...sectionMap.english, sectionPages })
+  }
+  if (sectionMap.math) {
+    sectionsWithPages.push({ ...sectionMap.math, sectionPages })
+  }
+  if (sectionMap.reading) {
+    sectionsWithPages.push({ ...sectionMap.reading, sectionPages })
+  }
+  
   
   return sectionsWithPages
 }
@@ -148,333 +205,15 @@ function cloneQuestions(questions: Extracted['questions']): Extracted['questions
   return questions.map(q => ({ ...q }))
 }
 
-function extractEnglish(englishText: string): Extracted {
-  const text = englishText
-    .replace(/GO ON TO THE NEXT PAGE\.?/gi, ' ')
-    .replace(/©\s?\d{4,}\s+by ACT[\s\S]*?(?=\n)/gi, ' ')
-    .replace(/Page\s+\d+\s+of\s+\d+/gi, ' ')
-    .replace(/QU[0-9A-Z.-]+/g, ' ')
-    .replace(/\n\s*(?:\d+\s+){2,}\n/g, '\n')
-    .replace(/I understand that by registering[\s\S]*?authorities\./gi, ' ')
-    .replace(/Terms and Conditions[\s\S]*?privacy\.html/gi, ' ')
-
-  const questions: Extracted['questions'] = []
-  
-  // Enhanced question detection: look for numbers followed by answer choices
-  // Must have a period after the number (like 6.) and find answer choices before next question
-  const questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
-  const nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 75)
-  
-  // Ensure we only get unique question numbers and they're in order
-  const uniqueNums = [...new Set(nums)].sort((a, b) => a - b)
-  
-  console.log(`Old ACT Parser: English section - Found ${uniqueNums.length} unique questions:`, uniqueNums)
-  
-  for (const qNum of uniqueNums) {
-    // Find the question block
-    const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.\\s+([\\s\\S]*?)(?=(?:\\n\\s*\\d{1,2}\\.\\s)|$)`, 'g')
-    const m = qRegex.exec(text)
-    if (!m) {
-      console.log(`Old ACT Parser: English question ${qNum} - No regex match found`)
-      continue
-    }
-    
-    const block = m[1]
-    const choiceStart = block.search(/(?:^|\s)([A-DFGHJ])[.)]\s+/)
-    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
-    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
-
-    const prompt = promptFragment.replace(/\s+/g, ' ').trim()
-
-    if (prompt.length < 10) {
-      console.log(`Old ACT Parser: English question ${qNum} - Prompt too short: "${prompt}"`)
-      continue
-    }
-    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) {
-      console.log(`Old ACT Parser: English question ${qNum} - Contains unwanted text`)
-      continue
-    }
-
-    const choices: string[] = []
-    const choiceLetters: string[] = []
-    if (choiceRegion) {
-      const choiceParts = choiceRegion.split(/([A-DFGHJ])[.)]\s*/)
-      
-      for (let i = 1; i < choiceParts.length; i += 2) {
-        if (i + 1 < choiceParts.length) {
-          const letter = choiceParts[i]
-          let choiceText = choiceParts[i + 1]
-          
-          const nextChoiceMatch = choiceText.match(/([A-DFGHJ])[.)]\s*/)
-          if (nextChoiceMatch) {
-            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
-            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
-            
-            if (parenCount <= 0) {
-              choiceText = beforeNextChoice
-            } else {
-              const searchText = choiceText
-              let parenLevel = 0
-              let cutIndex = -1
-              
-              for (let j = 0; j < searchText.length; j++) {
-                if (searchText[j] === '(') parenLevel++
-                else if (searchText[j] === ')') parenLevel--
-                else if (parenLevel === 0 && /[A-DFGHJ][.)]\s/.test(searchText.slice(j, j + 3))) {
-                  cutIndex = j
-                  break
-                }
-              }
-              
-              if (cutIndex !== -1) {
-                choiceText = searchText.slice(0, cutIndex)
-              }
-            }
-          }
-          
-          choiceText = choiceText.replace(/\s+/g, ' ').trim()
-          if (choiceText && choiceText.length > 0) {
-            choices.push(choiceText)
-            choiceLetters.push(letter)
-          }
-        }
-      }
-    }
-
-    if (choices.length >= 2) {
-      questions.push({
-        id: `english-${qNum}`,
-        prompt,
-        choices,
-        choiceLetters
-      })
-    } else {
-      console.log(`Old ACT Parser: English question ${qNum} - Not enough choices (${choices.length}):`, choices)
-    }
+// Remove "ACT" and everything after it from answer choices
+function cleanChoiceText(choiceText: string): string {
+  const actIndex = choiceText.search(/\bACT\b/i)
+  if (actIndex !== -1) {
+    return choiceText.slice(0, actIndex).trim()
   }
-
-  return { section: 'english', questions }
+  return choiceText
 }
 
-function extractMath(mathText: string): Extracted {
-  // Clean footers, page artifacts, and guidance lines
-  const text = mathText
-    .replace(/GO ON TO THE NEXT PAGE\.?/gi, ' ')
-    .replace(/©\s?\d{4,}\s+by ACT[\s\S]*?(?=\n)/gi, ' ')
-    .replace(/Page\s+\d+\s+of\s+\d+/gi, ' ')
-    .replace(/QU[0-9A-Z.-]+/g, ' ')
-    .replace(/\n\s*(?:\d+\s+){2,}\n/g, '\n') // sequences of numbers like 5 6 7 8...
-    // Remove legal statements and other non-question content
-    .replace(/I understand that by registering[\s\S]*?authorities\./gi, ' ')
-    .replace(/Terms and Conditions[\s\S]*?privacy\.html/gi, ' ')
-
-  const questions: Extracted['questions'] = []
-
-  // Extract question blocks by line-start numbers - be more specific
-  const qRegex = /(?:^|\n)\s*(\d{1,2})\.\s+([\s\S]*?)(?=(?:\n\s*\d{1,2}\.\s)|$)/g
-  let m: RegExpExecArray | null
-  while ((m = qRegex.exec(text)) !== null) {
-    const qNum = Number(m[1])
-    if (qNum < 1 || qNum > 60) continue // Old ACT Math has 60 questions
-    const block = m[2]
-
-    // Find the end of the question prompt - look for the first choice letter
-    const choiceStart = block.search(/(?:^|\s)([A-DFGHJK])[.)]\s+/)
-    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
-    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
-
-    // Clean up the prompt - remove extra whitespace and line breaks
-    const prompt = promptFragment
-      .replace(/\s+/g, ' ')
-      .trim()
-
-    // Skip if prompt is too short or contains obvious non-question content
-    if (prompt.length < 10) continue
-    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) continue
-
-    // Extract choices using a more robust approach
-    const choices: string[] = []
-    const choiceLetters: string[] = []
-    if (choiceRegion) {
-      // Split by choice letters and collect the text after each
-      const choiceParts = choiceRegion.split(/([A-DFGHJK])[.)]\s*/)
-      
-      for (let i = 1; i < choiceParts.length; i += 2) {
-        if (i + 1 < choiceParts.length) {
-          const letter = choiceParts[i]
-          let choiceText = choiceParts[i + 1]
-          
-          // Find where this choice ends by looking for the next choice letter
-          const nextChoiceMatch = choiceText.match(/([A-DFGHJK])[.)]\s*/)
-          if (nextChoiceMatch) {
-            // Only cut off if we're not inside parentheses
-            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
-            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
-            
-            if (parenCount <= 0) {
-              // We're not inside parentheses, safe to cut off
-              choiceText = beforeNextChoice
-            } else {
-              // We're inside parentheses, look for the next choice after closing all parentheses
-              const searchText = choiceText
-              let parenLevel = 0
-              let cutIndex = -1
-              
-              for (let j = 0; j < searchText.length; j++) {
-                if (searchText[j] === '(') parenLevel++
-                else if (searchText[j] === ')') parenLevel--
-                else if (parenLevel === 0 && /[A-DFGHJK][.)]\s/.test(searchText.slice(j, j + 3))) {
-                  cutIndex = j
-                  break
-                }
-              }
-              
-              if (cutIndex !== -1) {
-                choiceText = searchText.slice(0, cutIndex)
-              }
-            }
-          }
-          
-          // Clean up the choice text
-          choiceText = choiceText.replace(/\s+/g, ' ').trim()
-          if (choiceText && choiceText.length > 0) {
-            choices.push(choiceText)
-            choiceLetters.push(letter)
-          }
-        }
-      }
-    }
-
-    // Ensure we have exactly 4 choices
-    const finalChoices = choices.slice(0, 4)
-    const finalChoiceLetters = choiceLetters.slice(0, 4)
-    while (finalChoices.length < 4) {
-      finalChoices.push('') // Add empty choices if needed
-      finalChoiceLetters.push('') // Add empty choice letters if needed
-    }
-
-    // Skip if we don't have any valid choices
-    if (finalChoices.every(c => !c.trim())) continue
-
-    questions.push({
-      id: `math-${qNum}`,
-      prompt,
-      choices: finalChoices,
-      choiceLetters: finalChoiceLetters,
-    })
-  }
-
-  console.log(`Old ACT Parser: Math section - Found ${questions.length} questions`)
-  return { section: 'math', questions }
-}
-
-function extractReading(readingText: string): Extracted {
-  const text = readingText
-    .replace(/GO ON TO THE NEXT PAGE\.?/gi, ' ')
-    .replace(/©\s?\d{4,}\s+by ACT[\s\S]*?(?=\n)/gi, ' ')
-    .replace(/Page\s+\d+\s+of\s+\d+/gi, ' ')
-    .replace(/QU[0-9A-Z.-]+/g, ' ')
-    .replace(/\n\s*(?:\d+\s+){2,}\n/g, '\n')
-    .replace(/I understand that by registering[\s\S]*?authorities\./gi, ' ')
-    .replace(/Terms and Conditions[\s\S]*?privacy\.html/gi, ' ')
-
-  const questions: Extracted['questions'] = []
-  
-  // Enhanced question detection: look for numbers followed by answer choices
-  // Must have a period after the number (like 6.) and find answer choices before next question
-  const questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
-  const nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 40)
-  
-  // Ensure we only get unique question numbers and they're in order
-  const uniqueNums = [...new Set(nums)].sort((a, b) => a - b)
-  
-  console.log(`Old ACT Parser: Reading section - Found ${uniqueNums.length} unique questions:`, uniqueNums)
-  
-  for (const qNum of uniqueNums) {
-    // Find the question block
-    const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.\\s+([\\s\\S]*?)(?=(?:\\n\\s*\\d{1,2}\\.\\s)|$)`, 'g')
-    const m = qRegex.exec(text)
-    if (!m) {
-      console.log(`Old ACT Parser: Reading question ${qNum} - No regex match found`)
-      continue
-    }
-    
-    const block = m[1]
-    const choiceStart = block.search(/(?:^|\s)([A-DFGHJ])[.)]\s+/)
-    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
-    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
-
-    const prompt = promptFragment.replace(/\s+/g, ' ').trim()
-
-    if (prompt.length < 10) {
-      console.log(`Old ACT Parser: Reading question ${qNum} - Prompt too short: "${prompt}"`)
-      continue
-    }
-    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) {
-      console.log(`Old ACT Parser: Reading question ${qNum} - Contains unwanted text`)
-      continue
-    }
-
-    const choices: string[] = []
-    const choiceLetters: string[] = []
-    if (choiceRegion) {
-      const choiceParts = choiceRegion.split(/([A-DFGHJ])[.)]\s*/)
-      
-      for (let i = 1; i < choiceParts.length; i += 2) {
-        if (i + 1 < choiceParts.length) {
-          const letter = choiceParts[i]
-          let choiceText = choiceParts[i + 1]
-          
-          const nextChoiceMatch = choiceText.match(/([A-DFGHJ])[.)]\s*/)
-          if (nextChoiceMatch) {
-            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
-            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
-            
-            if (parenCount <= 0) {
-              choiceText = beforeNextChoice
-            } else {
-              const searchText = choiceText
-              let parenLevel = 0
-              let cutIndex = -1
-              
-              for (let j = 0; j < searchText.length; j++) {
-                if (searchText[j] === '(') parenLevel++
-                else if (searchText[j] === ')') parenLevel--
-                else if (parenLevel === 0 && /[A-DFGHJ][.)]\s/.test(searchText.slice(j, j + 3))) {
-                  cutIndex = j
-                  break
-                }
-              }
-              
-              if (cutIndex !== -1) {
-                choiceText = searchText.slice(0, cutIndex)
-              }
-            }
-          }
-          
-          choiceText = choiceText.replace(/\s+/g, ' ').trim()
-          if (choiceText && choiceText.length > 0) {
-            choices.push(choiceText)
-            choiceLetters.push(letter)
-          }
-        }
-      }
-    }
-
-    if (choices.length >= 2) {
-      questions.push({
-        id: `reading-${qNum}`,
-        prompt,
-        choices,
-        choiceLetters
-      })
-    } else {
-      console.log(`Old ACT Parser: Reading question ${qNum} - Not enough choices (${choices.length}):`, choices)
-    }
-  }
-
-  return { section: 'reading', questions }
-}
 
 function extractAnswerKey(text: string, sectionName: string, searchPattern: RegExp, endPattern?: RegExp): Record<number, string> | null {
   let sectionText: string
@@ -656,6 +395,8 @@ function sliceBetween(text: string, start: RegExp, end: RegExp): string | null {
   if (s === -1) return null
   const tail = text.slice(s)
   const e = tail.search(end)
+  
+  
   return e === -1 ? tail : tail.slice(0, e)
 }
 
@@ -693,13 +434,18 @@ export async function detectSectionPages(pdf: PDFDocumentProxy): Promise<Partial
 }
 
 // Map questions to their page numbers for old ACT format
-async function mapQuestionsToPages(pdf: PDFDocumentProxy, questions: Extracted['questions'], sectionStartPage: number): Promise<{
+async function mapQuestionsToPages(pdf: PDFDocumentProxy, questions: Extracted['questions'], sectionStartPage: number, section?: string): Promise<{
   questionsWithPages: Extracted['questions']
   pageQuestions: Record<number, string[]>
 }> {
   const questionsWithPages: Extracted['questions'] = []
   const pageQuestions: Record<number, string[]> = {}
   const processedQuestions = new Set<string>() // Track which questions we've already processed
+
+  // Determine the answer choice pattern based on section
+  // Math section uses ABCDE/FGHJK format, others use A-DFGHJ format
+  const isMathSection = section === 'math' || questions.some(q => q.id.startsWith('math-'))
+  const choicePattern = isMathSection ? '[A-DFGHJK]' : '[A-DFGHJ]'
 
   // Start from the section start page and scan forward
   for (let pageNum = sectionStartPage; pageNum <= pdf.numPages; pageNum++) {
@@ -712,7 +458,8 @@ async function mapQuestionsToPages(pdf: PDFDocumentProxy, questions: Extracted['
 
     // Enhanced question detection: look for numbers followed by answer choices
     // Must have a period after the number (like 6.) and find answer choices before next question
-    const questionMatches = Array.from(text.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJK][.)]\s+/g))
+    const questionRegex = new RegExp(`(?:^|\\n)\\s*(\\d{1,2})\\.\\s+[^]*?${choicePattern}[.)]\\s+`, 'g')
+    const questionMatches = Array.from(text.matchAll(questionRegex))
     const nums = questionMatches.map(m => Number(m[1])).filter(n => n >= 1 && n <= 75)
     const uniqueNums = [...new Set(nums)].sort((a, b) => a - b)
 
@@ -747,4 +494,455 @@ async function mapQuestionsToPages(pdf: PDFDocumentProxy, questions: Extracted['
   })
 
   return { questionsWithPages, pageQuestions }
+}
+
+// Extract English questions from specific pages
+function extractEnglishFromPages(pageTextMap: Record<number, string>, startPage: number): Extracted {
+  const questions: Extracted['questions'] = []
+  
+  // Extract questions from each page starting from the English start page
+  for (let pageNum = startPage; pageNum <= startPage + 20; pageNum++) { // Check next 20 pages max
+    if (!pageTextMap[pageNum]) {
+      continue
+    }
+    
+    const pageText = pageTextMap[pageNum]
+    
+    // Extract questions from this specific page
+    const pageQuestions = extractQuestionsFromPageText(pageText, pageNum)
+    questions.push(...pageQuestions)
+    
+    // Stop if we find "END OF TEST 1" or Math section
+    if (pageText.includes('END OF TEST 1') || pageText.includes('MATH TEST') || pageText.includes('MATHEMATICS TEST')) {
+      break
+    }
+  }
+  return { section: 'english', questions }
+}
+
+// Extract questions from a single page of text
+function extractQuestionsFromPageText(pageText: string, pageNum: number): Extracted['questions'] {
+  const questions: Extracted['questions'] = []
+  
+  // Enhanced question detection: look for numbers followed by answer choices
+  const questionMatches = Array.from(pageText.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
+  
+  // Filter to only include numbers that actually have answer choices within 500 characters
+  const validatedNums: number[] = []
+  for (const match of questionMatches) {
+    const questionNum = Number(match[1])
+    if (questionNum >= 1 && questionNum <= 75) {
+      const matchIndex = match.index!
+      const textAfterMatch = pageText.slice(matchIndex, matchIndex + 500)
+      
+      // Check if there are actual answer choices (A, B, C, D, F, G, H, J) within 500 characters
+      const hasAnswerChoices = /[A-DFGHJ][.)]\s+/.test(textAfterMatch)
+      
+      if (hasAnswerChoices) {
+        validatedNums.push(questionNum)
+      }
+    }
+  }
+  
+  // Ensure we only get unique question numbers and they're in order
+  const uniqueNums = [...new Set(validatedNums)].sort((a, b) => a - b)
+  
+  for (const qNum of uniqueNums) {
+    // Find the question block
+    const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.\\s+([\\s\\S]*?)(?=(?:\\n\\s*\\d{1,2}\\.\\s)|$)`, 'g')
+    const m = qRegex.exec(pageText)
+    if (!m) continue
+    
+    const block = m[1]
+    const choiceStart = block.search(/(?:^|\s)([A-DFGHJ])[.)]\s+/)
+    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
+    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
+
+    const prompt = promptFragment.replace(/\s+/g, ' ').trim()
+
+    // Allow questions with no prompt (Old ACT format) or short prompts
+    if (prompt.length > 0 && prompt.length < 10) continue
+    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) continue
+
+    const choices: string[] = []
+    const choiceLetters: string[] = []
+    if (choiceRegion) {
+      const choiceParts = choiceRegion.split(/([A-DFGHJ])[.)]\s*/)
+      
+      for (let i = 1; i < choiceParts.length; i += 2) {
+        if (i + 1 < choiceParts.length) {
+          const letter = choiceParts[i]
+          let choiceText = choiceParts[i + 1]
+          
+          const nextChoiceMatch = choiceText.match(/([A-DFGHJ])[.)]\s*/)
+          if (nextChoiceMatch) {
+            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
+            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
+            
+            if (parenCount <= 0) {
+              choiceText = beforeNextChoice
+            } else {
+              const searchText = choiceText
+              let parenLevel = 0
+              let cutIndex = -1
+              
+              for (let j = 0; j < searchText.length; j++) {
+                if (searchText[j] === '(') parenLevel++
+                else if (searchText[j] === ')') parenLevel--
+                else if (parenLevel === 0 && /[A-DFGHJ][.)]\s/.test(searchText.slice(j, j + 3))) {
+                  cutIndex = j
+                  break
+                }
+              }
+              
+              if (cutIndex !== -1) {
+                choiceText = searchText.slice(0, cutIndex)
+              }
+            }
+          }
+          
+          choiceText = choiceText.replace(/\s+/g, ' ').trim()
+          choiceText = cleanChoiceText(choiceText)
+          if (choiceText && choiceText.length > 0) {
+            choices.push(choiceText)
+            choiceLetters.push(letter)
+          }
+        }
+      }
+    }
+
+    if (choices.length >= 2) {
+      questions.push({
+        id: `english-${qNum}`,
+        prompt,
+        choices,
+        choiceLetters,
+        pageNumber: pageNum
+      })
+    }
+  }
+  
+  return questions
+}
+
+// Extract Math questions from specific pages
+function extractMathFromPages(pageTextMap: Record<number, string>, startPage: number): Extracted {
+  const questions: Extracted['questions'] = []
+  
+  // Extract questions from each page starting from the Math start page
+  for (let pageNum = startPage; pageNum <= startPage + 20; pageNum++) { // Check next 20 pages max
+    if (!pageTextMap[pageNum]) {
+      continue
+    }
+    
+    const pageText = pageTextMap[pageNum]
+    
+    // Extract questions from this specific page
+    const pageQuestions = extractMathQuestionsFromPageText(pageText, pageNum)
+    questions.push(...pageQuestions)
+    
+    // Stop if we find "END OF TEST 2" or Reading section
+    if (pageText.includes('END OF TEST 2') || pageText.includes('READING TEST')) {
+      break
+    }
+  }
+  return { section: 'math', questions }
+}
+
+// Extract Math questions from a single page of text
+function extractMathQuestionsFromPageText(pageText: string, pageNum: number): Extracted['questions'] {
+  const questions: Extracted['questions'] = []
+  
+  // Enhanced question detection: look for numbers followed by answer choices (including E and K for Math)
+  const questionMatches = Array.from(pageText.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJK][.)]\s+/g))
+  
+  // Filter to only include numbers that actually have answer choices within 500 characters
+  const validatedNums: number[] = []
+  for (const match of questionMatches) {
+    const questionNum = Number(match[1])
+    if (questionNum >= 1 && questionNum <= 60) { // Old ACT Math has 60 questions
+      const matchIndex = match.index!
+      const textAfterMatch = pageText.slice(matchIndex, matchIndex + 500)
+      
+      // Check if there are actual answer choices (A, B, C, D, E, F, G, H, J, K) within 500 characters
+      const hasAnswerChoices = /[A-DFGHJK][.)]\s+/.test(textAfterMatch)
+      
+      // Debug: Check question 2 specifically
+      if (questionNum === 2) {
+        console.log('🔍 DEBUG QUESTION 2 VALIDATION:')
+        console.log('Match index:', matchIndex)
+        console.log('Text after match (first 200 chars):', textAfterMatch.substring(0, 200))
+        console.log('Has answer choices:', hasAnswerChoices)
+        console.log('Answer choice pattern found:', textAfterMatch.match(/[A-DFGHJK][.)]\s+/)?.[0] || 'none')
+      }
+      
+      if (hasAnswerChoices) {
+        validatedNums.push(questionNum)
+      }
+    }
+  }
+  
+  // Ensure we only get unique question numbers and they're in order
+  const uniqueNums = [...new Set(validatedNums)].sort((a, b) => a - b)
+  
+  for (const qNum of uniqueNums) {
+    // Find the question block
+    const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.\\s+([\\s\\S]*?)(?=(?:\\n\\s*\\d{1,2}\\.\\s)|$)`, 'g')
+    const m = qRegex.exec(pageText)
+    if (!m) {
+      // Debug: Check why question block wasn't found
+      if (qNum === 2) {
+        console.log('🔍 DEBUG QUESTION 2 BLOCK: No regex match found for question block')
+      }
+      continue
+    }
+    
+    const block = m[1]
+    
+    // Debug: Check question 2 block extraction
+    if (qNum === 2) {
+      console.log('🔍 DEBUG QUESTION 2 BLOCK:')
+      console.log('Block found, length:', block?.length || 0)
+      console.log('Block content (first 200 chars):', block?.substring(0, 200) || 'no content')
+    }
+    
+    const choiceStart = block.search(/(?:^|\s)([A-DFGHJK])[.)]\s+/)
+    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
+    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
+
+    const prompt = promptFragment.replace(/\s+/g, ' ').trim()
+
+    if (prompt.length < 10) continue
+    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) continue
+
+    const choices: string[] = []
+    const choiceLetters: string[] = []
+    if (choiceRegion) {
+      const choiceParts = choiceRegion.split(/([A-DFGHJK])[.)]\s*/)
+      
+      for (let i = 1; i < choiceParts.length; i += 2) {
+        if (i + 1 < choiceParts.length) {
+          const letter = choiceParts[i]
+          let choiceText = choiceParts[i + 1]
+          
+          const nextChoiceMatch = choiceText.match(/([A-DFGHJK])[.)]\s*/)
+          if (nextChoiceMatch) {
+            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
+            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
+            
+            if (parenCount <= 0) {
+              choiceText = beforeNextChoice
+            } else {
+              const searchText = choiceText
+              let parenLevel = 0
+              let cutIndex = -1
+              
+              for (let j = 0; j < searchText.length; j++) {
+                if (searchText[j] === '(') parenLevel++
+                else if (searchText[j] === ')') parenLevel--
+                else if (parenLevel === 0 && /[A-DFGHJK][.)]\s/.test(searchText.slice(j, j + 3))) {
+                  cutIndex = j
+                  break
+                }
+              }
+              
+              if (cutIndex !== -1) {
+                choiceText = searchText.slice(0, cutIndex)
+              }
+            }
+          }
+          
+          choiceText = choiceText.replace(/\s+/g, ' ').trim()
+          choiceText = cleanChoiceText(choiceText)
+          if (choiceText && choiceText.length > 0) {
+            choices.push(choiceText)
+            choiceLetters.push(letter)
+          }
+        }
+      }
+    }
+
+    // Debug: Check why question 2 is not being added
+    if (qNum === 2) {
+      console.log('🔍 DEBUG QUESTION 2 FINAL VALIDATION:')
+      console.log('Prompt length:', prompt.length)
+      console.log('Choices length:', choices.length)
+      console.log('Choice letters:', choiceLetters)
+      console.log('Will be added:', choices.length >= 2)
+    }
+    
+    // For Math questions, ensure we have 5 choices (A-E or F-K)
+    if (choices.length > 0) {
+      // Ensure we have exactly 5 choices for Math
+      const finalChoices = [...choices]
+      const finalChoiceLetters = [...choiceLetters]
+      
+      // Fill up to 5 choices if needed
+      while (finalChoices.length < 5) {
+        finalChoices.push('')
+        finalChoiceLetters.push('')
+      }
+      
+      // Ensure we have exactly 5 choices
+      const mathChoices = finalChoices.slice(0, 5)
+      const mathChoiceLetters = finalChoiceLetters.slice(0, 5)
+      
+      questions.push({
+        id: `math-${qNum}`,
+        prompt,
+        choices: mathChoices,
+        choiceLetters: mathChoiceLetters,
+        pageNumber: pageNum
+      })
+    }
+  }
+  
+  return questions
+}
+
+// Extract Reading questions from specific pages
+function extractReadingFromPages(pageTextMap: Record<number, string>, startPage: number): Extracted {
+  const questions: Extracted['questions'] = []
+  
+  // Extract questions from each page starting from the Reading start page
+  for (let pageNum = startPage; pageNum <= startPage + 20; pageNum++) { // Check next 20 pages max
+    if (!pageTextMap[pageNum]) {
+      continue
+    }
+    
+    const pageText = pageTextMap[pageNum]
+    
+    // Extract questions from this specific page
+    const pageQuestions = extractReadingQuestionsFromPageText(pageText, pageNum)
+    questions.push(...pageQuestions)
+    
+    // Stop if we find "END OF TEST 3" or Science section
+    if (pageText.includes('END OF TEST 3') || pageText.includes('SCIENCE TEST')) {
+      break
+    }
+  }
+  return { section: 'reading', questions }
+}
+
+// Extract Reading questions from a single page of text
+function extractReadingQuestionsFromPageText(pageText: string, pageNum: number): Extracted['questions'] {
+  const questions: Extracted['questions'] = []
+  
+  // Enhanced question detection: look for numbers followed by answer choices
+  const questionMatches = Array.from(pageText.matchAll(/(?:^|\n)\s*(\d{1,2})\.\s+[^]*?[A-DFGHJ][.)]\s+/g))
+  
+  // Filter to only include numbers that actually have answer choices within 500 characters
+  const validatedNums: number[] = []
+  for (const match of questionMatches) {
+    const questionNum = Number(match[1])
+    if (questionNum >= 1 && questionNum <= 40) { // Old ACT Reading has 40 questions
+      const matchIndex = match.index!
+      const textAfterMatch = pageText.slice(matchIndex, matchIndex + 500)
+      
+      // Check if there are actual answer choices (A, B, C, D, F, G, H, J) within 500 characters
+      const hasAnswerChoices = /[A-DFGHJ][.)]\s+/.test(textAfterMatch)
+      
+      if (hasAnswerChoices) {
+        validatedNums.push(questionNum)
+      }
+    }
+  }
+  
+  // Ensure we only get unique question numbers and they're in order
+  const uniqueNums = [...new Set(validatedNums)].sort((a, b) => a - b)
+  
+  for (const qNum of uniqueNums) {
+    // Find the question block
+    const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.\\s+([\\s\\S]*?)(?=(?:\\n\\s*\\d{1,2}\\.\\s)|$)`, 'g')
+    const m = qRegex.exec(pageText)
+    if (!m) continue
+    
+    const block = m[1]
+    const choiceStart = block.search(/(?:^|\s)([A-DFGHJ])[.)]\s+/)
+    const promptFragment = choiceStart !== -1 ? block.slice(0, choiceStart) : block
+    const choiceRegion = choiceStart !== -1 ? block.slice(choiceStart) : ''
+
+    const prompt = promptFragment.replace(/\s+/g, ' ').trim()
+
+    if (prompt.length < 10) continue
+    if (prompt.includes('I understand') || prompt.includes('Terms and Conditions') || prompt.includes('ACT Privacy Policy')) continue
+
+    const choices: string[] = []
+    const choiceLetters: string[] = []
+    if (choiceRegion) {
+      const choiceParts = choiceRegion.split(/([A-DFGHJ])[.)]\s*/)
+      
+      for (let i = 1; i < choiceParts.length; i += 2) {
+        if (i + 1 < choiceParts.length) {
+          const letter = choiceParts[i]
+          let choiceText = choiceParts[i + 1]
+          
+          const nextChoiceMatch = choiceText.match(/([A-DFGHJ])[.)]\s*/)
+          if (nextChoiceMatch) {
+            const beforeNextChoice = choiceText.slice(0, nextChoiceMatch.index)
+            const parenCount = (beforeNextChoice.match(/\(/g) || []).length - (beforeNextChoice.match(/\)/g) || []).length
+            
+            if (parenCount <= 0) {
+              choiceText = beforeNextChoice
+            } else {
+              const searchText = choiceText
+              let parenLevel = 0
+              let cutIndex = -1
+              
+              for (let j = 0; j < searchText.length; j++) {
+                if (searchText[j] === '(') parenLevel++
+                else if (searchText[j] === ')') parenLevel--
+                else if (parenLevel === 0 && /[A-DFGHJ][.)]\s/.test(searchText.slice(j, j + 3))) {
+                  cutIndex = j
+                  break
+                }
+              }
+              
+              if (cutIndex !== -1) {
+                choiceText = searchText.slice(0, cutIndex)
+              }
+            }
+          }
+          
+          choiceText = choiceText.replace(/\s+/g, ' ').trim()
+          choiceText = cleanChoiceText(choiceText)
+          if (choiceText && choiceText.length > 0) {
+            choices.push(choiceText)
+            choiceLetters.push(letter)
+          }
+        }
+      }
+    }
+
+    if (choices.length >= 2) {
+      questions.push({
+        id: `reading-${qNum}`,
+        prompt,
+        choices,
+        choiceLetters,
+        pageNumber: pageNum
+      })
+    }
+  }
+  
+  return questions
+}
+
+// Helper function to get text from specific pages
+export function getTextFromPages(pageTextMap: Record<number, string>, startPage: number, endPage?: number): string {
+  const pages: string[] = []
+  const end = endPage || startPage
+  
+  for (let i = startPage; i <= end; i++) {
+    if (pageTextMap[i]) {
+      pages.push(pageTextMap[i])
+    }
+  }
+  
+  return pages.join('\n')
+}
+
+// Helper function to get text from a single page
+export function getTextFromPage(pageTextMap: Record<number, string>, pageNum: number): string {
+  return pageTextMap[pageNum] || ''
 }
