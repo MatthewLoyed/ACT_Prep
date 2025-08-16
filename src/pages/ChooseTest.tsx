@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listTestsFromLocalStorage, setActiveTestId, getActiveTestId, clearAllTestsFromLocalStorage } from '../lib/localTestStore'
+import { listTestsFromLocalStorage, setActiveTestId, getActiveTestId } from '../lib/localTestStore'
 
 export default function ChooseTest() {
   const navigate = useNavigate()
@@ -69,7 +69,7 @@ export default function ChooseTest() {
           onClick={async () => {
             if (confirm('Clear all saved tests? This cannot be undone.')) {
               try {
-                await clearAllTestsFromSupabase()
+                // Note: clearAllTests functionality removed - use individual delete instead
                 setActive(null)
                 setTests([])
                 console.log('All tests cleared successfully from database')

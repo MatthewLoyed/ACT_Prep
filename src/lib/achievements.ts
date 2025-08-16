@@ -220,7 +220,7 @@ export function addNewAchievements(newAchievements: Achievement[]): void {
   saveUserAchievements(updated)
 }
 
-export function getAchievementProgress(stats: UserStats): {
+export function getAchievementProgress(_stats: UserStats): {
   earned: Achievement[]
   available: Achievement[]
   total: number

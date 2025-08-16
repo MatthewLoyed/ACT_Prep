@@ -5,7 +5,6 @@ import ProgressCircle from '../components/ProgressCircle'
 import { 
   getAchievementProgress, 
   type UserStats, 
-  type Achievement,
   addNewAchievements,
   checkAchievements
 } from '../lib/achievements'
