@@ -2,12 +2,12 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
-import { getNextDefaultName, saveTestToSupabase, listTestsFromSupabase } from '../lib/supabaseTestStore'
+import { getNextDefaultName, saveTestToLocalStorage, listTestsFromLocalStorage } from '../lib/localTestStore'
 import EngagingLoader from '../components/EngagingLoader'
 import { parsePdf, type Extracted } from '../lib/pdfParser'
 
 // Configure pdfjs worker from local node_modules to avoid CDN import failures
-// Vite will serve this asset in dev
+// Use local worker to avoid CDN issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
@@ -75,7 +75,7 @@ export default function ImportTest() {
         })
         
         try {
-          const saved = await saveTestToSupabase({ 
+          const saved = await saveTestToLocalStorage({ 
             name, 
             sections: sectionsRecord, 
             pdfData: base64,
@@ -107,8 +107,8 @@ export default function ImportTest() {
     let counter = 1
     
     // Get existing tests to check for name conflicts
-    const existingTests = await listTestsFromSupabase()
-    const existingNames = new Set(existingTests.map((test) => test.name))
+    const existingTests = await listTestsFromLocalStorage()
+    const existingNames = new Set(existingTests.map((test: any) => test.name))
     
     // Check if name already exists and add suffix if needed
     while (existingNames.has(name)) {

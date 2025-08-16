@@ -43,7 +43,7 @@ export default function EngagingLoader({
           repeat: Infinity,
           ease: "easeInOut"
         }}
-        className={`${sizeClasses[size]} bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
+        className={`${sizeClasses[size]} bg-gradient-to-br from-[#ffeaa7] to-[#fdcb6e] rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
       >
         <Brain className={`${iconSizes[size]} text-white`} weight="fill" />
         
@@ -71,7 +71,7 @@ export default function EngagingLoader({
                   delay: i * 0.3,
                   ease: "easeOut"
                 }}
-                className="absolute w-1 h-1 bg-yellow-300 rounded-full"
+                className="absolute w-1 h-1 bg-[#ffeaa7] rounded-full"
               />
             ))}
           </>
@@ -88,7 +88,7 @@ export default function EngagingLoader({
             repeat: Infinity,
             ease: "easeOut"
           }}
-          className="absolute inset-0 w-full h-full border-2 border-yellow-400 rounded-full pointer-events-none"
+          className="absolute inset-0 w-full h-full border-2 border-[#ffeaa7] rounded-full pointer-events-none"
         />
       </motion.div>
 
@@ -118,7 +118,7 @@ export default function EngagingLoader({
                 delay: i * 0.2,
                 ease: "easeInOut"
               }}
-                             className="w-2 h-2 bg-yellow-500 rounded-full"
+                             className="w-2 h-2 bg-[#ffeaa7] rounded-full"
             />
           ))}
         </motion.div>

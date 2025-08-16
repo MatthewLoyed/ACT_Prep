@@ -2,9 +2,9 @@ import { motion, useSpring, useTransform } from "framer-motion"
 import { useEffect } from "react"
 
 function Number({ mv, number, height }: { mv: any; number: number; height: number }) {
-  let y = useTransform(mv, (latest: number) => {
-    let placeValue = latest % 10
-    let offset = (10 + number - placeValue) % 10
+  const y = useTransform(mv, (latest: number) => {
+    const placeValue = latest % 10
+    const offset = (10 + number - placeValue) % 10
     let memo = offset * height
     if (offset > 5) {
       memo -= 10 * height
@@ -20,8 +20,8 @@ function Number({ mv, number, height }: { mv: any; number: number; height: numbe
 }
 
 function Digit({ place, value, height }: { place: number; value: number; height: number }) {
-  let valueRoundedToPlace = Math.floor(value / place)
-  let animatedValue = useSpring(valueRoundedToPlace)
+  const valueRoundedToPlace = Math.floor(value / place)
+  const animatedValue = useSpring(valueRoundedToPlace)
   
   useEffect(() => {
     animatedValue.set(valueRoundedToPlace)

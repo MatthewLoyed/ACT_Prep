@@ -36,7 +36,7 @@ export default function BrainAnimation({ isThinking, size = 'md' }: BrainAnimati
         } : {
           duration: 0.3
         }}
-        className={`${sizeClasses[size]} bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
+        className={`${sizeClasses[size]} bg-gradient-to-br from-[#ffeaa7] to-[#fdcb6e] rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
       >
                  <Brain className={`${iconSizes[size]} text-white`} weight="fill" />
         
@@ -64,7 +64,7 @@ export default function BrainAnimation({ isThinking, size = 'md' }: BrainAnimati
                   delay: i * 0.5,
                   ease: "easeOut"
                 }}
-                className="absolute w-1 h-1 bg-yellow-300 rounded-full"
+                className="absolute w-1 h-1 bg-[#ffeaa7] rounded-full"
               />
             ))}
           </>

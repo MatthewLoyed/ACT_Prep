@@ -11,7 +11,7 @@ import {
   Brain,
   Star
 } from '@phosphor-icons/react'
-import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+import { loadTestFromLocalStorage } from '../lib/localTestStore'
 
 type SectionId = 'english' | 'math' | 'reading' | 'science'
 
@@ -48,7 +48,7 @@ export default function TestReview() {
       
       try {
         setLoading(true)
-        const loadedTest = await loadTestFromSupabase(testId)
+        const loadedTest = await loadTestFromLocalStorage(testId)
         
         // Parse answers from URL
         const parsedAnswers = JSON.parse(decodeURIComponent(answersParam))
@@ -104,7 +104,7 @@ export default function TestReview() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-purple-800 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-white text-xl">Loading test review...</div>
       </div>
     )
@@ -112,7 +112,7 @@ export default function TestReview() {
 
   if (showQuestionDetail && selectedQuestion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-purple-800 p-4">
+      <div className="min-h-screen p-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
@@ -161,7 +161,7 @@ export default function TestReview() {
                     </div>
                     <div className="flex-1">
                       <span className="font-medium mr-2">
-                        {selectedQuestion.choiceLetters?.[index] || String.fromCharCode(65 + index)}.
+                        {(selectedQuestion.choiceLetters?.[index] || String.fromCharCode(65 + index)).replace(/\.$/, '')}.
                       </span>
                       {cleanMathText(choice)}
                     </div>
@@ -175,14 +175,14 @@ export default function TestReview() {
               <div className="text-white/80 text-sm">
                 <strong>Your Answer:</strong> {
                   answers[selectedQuestion.id] !== undefined 
-                    ? selectedQuestion.choiceLetters?.[answers[selectedQuestion.id]] || String.fromCharCode(65 + answers[selectedQuestion.id])
+                    ? (selectedQuestion.choiceLetters?.[answers[selectedQuestion.id]] || String.fromCharCode(65 + answers[selectedQuestion.id])).replace(/\.$/, '') + '.'
                     : 'Not answered'
                 }
               </div>
               <div className="text-white/80 text-sm mt-1">
                 <strong>Correct Answer:</strong> {
                   selectedQuestion.answerIndex !== undefined
-                    ? selectedQuestion.choiceLetters?.[selectedQuestion.answerIndex] || String.fromCharCode(65 + selectedQuestion.answerIndex)
+                    ? (selectedQuestion.choiceLetters?.[selectedQuestion.answerIndex] || String.fromCharCode(65 + selectedQuestion.answerIndex)).replace(/\.$/, '') + '.'
                     : 'Not available'
                 }
               </div>
@@ -194,7 +194,7 @@ export default function TestReview() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-purple-800 p-4">
+    <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

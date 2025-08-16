@@ -6,36 +6,69 @@ import {
   Trash,
   ArrowUpRight,
   BookOpen,
-  Star
+  Star,
+  PencilSimple,
+  PushPin
 } from '@phosphor-icons/react'
 
 type UserTip = {
   id: string
   text: string
   createdAt: string
+  isPinned?: boolean
 }
 
 export default function Tips() {
   const [userTips, setUserTips] = useState<UserTip[]>([])
   const [newTip, setNewTip] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingTipId, setEditingTipId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
 
   // Load user tips from localStorage on component mount
   useEffect(() => {
-    const savedTips = localStorage.getItem('userTips')
-    if (savedTips) {
-      try {
-        setUserTips(JSON.parse(savedTips))
-      } catch (error) {
-        console.error('Failed to load user tips:', error)
-      }
+    // Check if localStorage is available
+    if (typeof window === 'undefined' || !window.localStorage) {
+      setTipsLoaded(true) // Mark as loaded even if failed
+      return
     }
+    
+    try {
+      const savedTips = localStorage.getItem('userTips')
+      
+      if (savedTips) {
+        const parsedTips = JSON.parse(savedTips)
+        setUserTips(parsedTips)
+      }
+    } catch (error) {
+      console.error('❌ Error accessing localStorage:', error)
+    }
+    
+    // Mark tips as loaded (whether we found any or not)
+    setTipsLoaded(true)
   }, [])
+
+  // Track if tips have been loaded from localStorage
+  const [tipsLoaded, setTipsLoaded] = useState(false)
 
   // Save user tips to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('userTips', JSON.stringify(userTips))
-  }, [userTips])
+    // Don't save until tips have been loaded from localStorage
+    if (!tipsLoaded) {
+      return
+    }
+    
+    // Check if localStorage is available
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return
+    }
+    
+    try {
+      localStorage.setItem('userTips', JSON.stringify(userTips))
+    } catch (error) {
+      console.error('❌ Error saving tips to localStorage:', error)
+    }
+  }, [userTips, tipsLoaded])
 
   const addTip = () => {
     if (newTip.trim()) {
@@ -44,6 +77,7 @@ export default function Tips() {
         text: newTip.trim(),
         createdAt: new Date().toISOString()
       }
+      
       setUserTips(prev => [tip, ...prev])
       setNewTip('')
       setShowAddForm(false)
@@ -52,6 +86,47 @@ export default function Tips() {
 
   const deleteTip = (id: string) => {
     setUserTips(prev => prev.filter(tip => tip.id !== id))
+  }
+
+  const editTip = (id: string) => {
+    const tip = userTips.find(t => t.id === id)
+    if (tip) {
+      setEditingTipId(id)
+      setEditingText(tip.text)
+    }
+  }
+
+  const saveEdit = () => {
+    if (editingTipId && editingText.trim()) {
+      setUserTips(prev => prev.map(tip => 
+        tip.id === editingTipId 
+          ? { ...tip, text: editingText.trim() }
+          : tip
+      ))
+      setEditingTipId(null)
+      setEditingText('')
+    }
+  }
+
+  const cancelEdit = () => {
+    setEditingTipId(null)
+    setEditingText('')
+  }
+
+  const togglePin = (id: string) => {
+    setUserTips(prev => prev.map(tip => 
+      tip.id === id 
+        ? { ...tip, isPinned: !tip.isPinned }
+        : tip
+    ))
+  }
+
+  const handlePinWithAnimation = (id: string) => {
+    const tip = userTips.find(t => t.id === id)
+    if (tip) {
+      // Simple toggle without complex animations
+      togglePin(id)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -87,7 +162,7 @@ export default function Tips() {
           className="card p-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <BookOpen className="w-8 h-8 text-yellow-400" weight="fill" />
+            <BookOpen className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
             <h2 className="text-2xl font-bold text-white">Official ACT® Resources</h2>
           </div>
           
@@ -128,12 +203,12 @@ export default function Tips() {
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Lightbulb className="w-8 h-8 text-yellow-400" weight="fill" />
+              <Lightbulb className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
               <h2 className="text-2xl font-bold text-white">Your Study Tips</h2>
             </div>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-gray-800 font-bold py-2 px-4 rounded-xl hover:scale-105 transition-transform"
+              className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-xl hover:scale-105 transition-transform"
             >
               <Plus className="w-5 h-5" />
               Add Tip
@@ -164,7 +239,7 @@ export default function Tips() {
                 <button
                   onClick={addTip}
                   disabled={!newTip.trim()}
-                  className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-gray-800 font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   Save Tip
@@ -195,7 +270,7 @@ export default function Tips() {
               </p>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-gray-800 font-bold py-3 px-6 rounded-xl hover:scale-105 transition-transform mx-auto"
+                className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-3 px-6 rounded-xl hover:scale-105 transition-transform mx-auto"
               >
                 <Plus className="w-5 h-5" />
                 Add Your First Tip
@@ -203,28 +278,127 @@ export default function Tips() {
             </div>
           ) : (
             <div className="space-y-4">
-              {userTips.map((tip) => (
-                <motion.div
-                  key={tip.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/20"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-white text-lg leading-relaxed">{tip.text}</p>
-                      <p className="text-white/60 text-sm mt-2">
-                        Added {formatDate(tip.createdAt)}
+              {userTips
+                .sort((a, b) => {
+                  // Sort pinned tips first, then by creation date (newest first)
+                  if (a.isPinned && !b.isPinned) return -1
+                  if (!a.isPinned && b.isPinned) return 1
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                })
+                .map((tip) => (
+                                                  <motion.div
+                   key={tip.id}
+                   initial={{ opacity: 0, y: 20 }}
+                   animate={{ 
+                     opacity: 1, 
+                     y: tip.isPinned ? -10 : 0,
+                     scale: tip.isPinned ? 1.02 : 1
+                   }}
+                   transition={{ 
+                     duration: 0.3,
+                     type: "spring",
+                     stiffness: 200,
+                     damping: 15
+                   }}
+                   className={`bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/20 group hover:bg-white/15 transition-all duration-200 ${
+                     tip.isPinned ? 'ring-2 ring-[#ffeaa7] ring-opacity-50 shadow-lg' : ''
+                   }`}
+                 >
+                  {editingTipId === tip.id ? (
+                    // Edit mode
+                    <div className="space-y-3">
+                      <textarea
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="w-full p-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 resize-none"
+                        rows={3}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey) {
+                            saveEdit()
+                          }
+                          if (e.key === 'Escape') {
+                            cancelEdit()
+                          }
+                        }}
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={saveEdit}
+                          disabled={!editingText.trim()}
+                          className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-4 py-2 text-white/80 hover:text-white transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-white/60">
+                        💡 Tip: Press Ctrl+Enter to save or Escape to cancel
                       </p>
                     </div>
-                    <button
-                      onClick={() => deleteTip(tip.id)}
-                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
-                      title="Delete tip"
-                    >
-                      <Trash className="w-5 h-5" />
-                    </button>
-                  </div>
+                  ) : (
+                    // View mode
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-2">
+                          {tip.isPinned && (
+                            <PushPin className="w-4 h-4 text-[#ffeaa7] mt-1 flex-shrink-0" weight="fill" />
+                          )}
+                          <p className="text-white text-lg leading-relaxed">{tip.text}</p>
+                        </div>
+                        <p className="text-white/60 text-sm mt-2">
+                          Added {formatDate(tip.createdAt)}
+                        </p>
+                      </div>
+                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                         <motion.button
+                           onClick={() => editTip(tip.id)}
+                           className="p-2 text-[#ffeaa7] hover:text-[#fdcb6e] hover:bg-[#ffeaa7]/20 rounded-lg transition-colors"
+                           title="Edit tip"
+                           whileHover={{ scale: 1.1 }}
+                           whileTap={{ scale: 0.95 }}
+                         >
+                           <PencilSimple className="w-5 h-5" />
+                         </motion.button>
+                         <motion.button
+                           onClick={() => handlePinWithAnimation(tip.id)}
+                           className={`p-2 rounded-lg transition-colors ${
+                             tip.isPinned 
+                               ? 'text-[#ffeaa7] hover:text-[#fdcb6e] hover:bg-[#ffeaa7]/20' 
+                               : 'text-white/60 hover:text-[#ffeaa7] hover:bg-[#ffeaa7]/20'
+                           }`}
+                           title={tip.isPinned ? 'Unpin tip' : 'Pin tip'}
+                           whileHover={{ scale: 1.1 }}
+                           whileTap={{ scale: 0.95 }}
+                           animate={tip.isPinned ? { 
+                             scale: [1, 1.2, 1],
+                             rotate: [0, 5, -5, 0]
+                           } : {}}
+                           transition={{ duration: 0.3 }}
+                         >
+                           <motion.div
+                             animate={tip.isPinned ? { rotate: 0 } : { rotate: -45 }}
+                             transition={{ duration: 0.2 }}
+                           >
+                             <PushPin className="w-5 h-5" weight={tip.isPinned ? 'fill' : 'regular'} />
+                           </motion.div>
+                         </motion.button>
+                         <motion.button
+                           onClick={() => deleteTip(tip.id)}
+                           className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
+                           title="Delete tip"
+                           whileHover={{ scale: 1.1 }}
+                           whileTap={{ scale: 0.95 }}
+                         >
+                           <Trash className="w-5 h-5" />
+                         </motion.button>
+                       </div>
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </div>
@@ -239,7 +413,7 @@ export default function Tips() {
           className="card p-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <Star className="w-8 h-8 text-yellow-400" weight="fill" />
+            <Star className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
             <h2 className="text-2xl font-bold text-white">Quick Study Tips</h2>
           </div>
           
@@ -270,6 +444,53 @@ export default function Tips() {
               <p className="text-secondary text-sm">
                 Focus on data interpretation rather than memorization. Look for trends, patterns, and relationships in the data.
               </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* YouTube Video Section */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.8 }}
+          className="card p-6"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="text-3xl">📺</div>
+            <h2 className="text-2xl font-bold text-white">ACT® Study Video</h2>
+          </div>
+          
+          <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+            <div className="flex items-start gap-4">
+              <div className="text-2xl">🎥</div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold mb-2">ACT® Test Prep: Complete Guide</h3>
+                <p className="text-secondary mb-4">
+                  Watch this comprehensive guide to understand the ACT® test structure, timing strategies, and proven study techniques to boost your score.
+                </p>
+                
+                                 {/* YouTube Video Embed */}
+                 <div className="relative w-full pb-[56.25%] h-0 overflow-hidden rounded-2xl shadow-lg bg-gray-900">
+                   <iframe
+                     className="absolute top-0 left-0 w-full h-full"
+                     src="https://www.youtube.com/embed/uTYdu1O53uw?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&cc_load_policy=0&disablekb=1"
+                     title="YouTube video player"
+                     frameBorder="0"
+                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                     allowFullScreen
+                   ></iframe>
+                 </div>
+                
+                <div className="mt-4 text-sm text-secondary">
+                  <p>💡 <strong>Key Takeaways:</strong></p>
+                  <ul className="mt-2 space-y-1 ml-4">
+                    <li>• Understanding the ACT® test format and timing</li>
+                    <li>• Effective study strategies for each section</li>
+                    <li>• Time management techniques</li>
+                    <li>• Common mistakes to avoid</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>

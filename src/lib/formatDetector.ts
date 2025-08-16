@@ -1,5 +1,5 @@
 // Format detection based on filename and content analysis
-export type TestFormat = 'enhanced_act' | 'old_act' | 'other'
+export type TestFormat = 'enhanced_act' | 'old_act'
 
 export interface FormatDetectionResult {
   format: TestFormat
@@ -7,7 +7,7 @@ export interface FormatDetectionResult {
   reason: string
 }
 
-export function detectFormat(filename: string, _content?: string): FormatDetectionResult {
+export function detectFormat(filename: string): FormatDetectionResult {
   const lowerFilename = filename.toLowerCase()
   
   // Enhanced ACT format detection - ONLY look for "Preparing" in filename
@@ -28,10 +28,10 @@ export function detectFormat(filename: string, _content?: string): FormatDetecti
     }
   }
   
-  // All other files use other parser
+  // All other files use generic (old ACT) parser
   return {
-    format: 'other',
+    format: 'old_act',
     confidence: 0.7,
-    reason: 'Using other parser for non-ACT format tests'
+    reason: 'Using generic parser for non-enhanced ACT format tests'
   }
 }

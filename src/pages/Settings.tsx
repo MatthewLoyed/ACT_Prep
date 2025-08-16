@@ -3,8 +3,7 @@ import { motion } from 'framer-motion'
 import { 
   SpeakerHigh, 
   SpeakerSlash, 
-  SpeakerLow, 
-  SpeakerSimpleX
+  SpeakerLow
 } from '@phosphor-icons/react'
 
 export default function Settings() {
@@ -47,16 +46,21 @@ export default function Settings() {
 
   const getVolumeIcon = () => {
     if (isMuted || volume === 0) return <SpeakerSlash className="w-6 h-6" />
-    if (volume < 30) return <SpeakerLow className="w-6 h-6" />
-    if (volume < 70) return <SpeakerSimpleX className="w-6 h-6" />
+    if (volume < 50) return <SpeakerLow className="w-6 h-6" />
     return <SpeakerHigh className="w-6 h-6" />
   }
 
   const getVolumeColor = () => {
     if (isMuted || volume === 0) return 'text-red-400'
-    if (volume < 30) return 'text-yellow-400'
-    if (volume < 70) return 'text-orange-400'
+    if (volume < 50) return 'text-yellow-400'
     return 'text-green-400'
+  }
+
+  const getVolumeBorderColor = () => {
+    if (isMuted || volume === 0) return 'border-red-400'
+    if (volume < 30) return 'border-yellow-400'
+    if (volume < 70) return 'border-orange-400'
+    return 'border-green-400'
   }
 
   return (
@@ -101,7 +105,7 @@ export default function Settings() {
                   className={`p-3 rounded-xl transition-all duration-200 hover:scale-105 ${
                     isMuted 
                       ? 'bg-red-500/20 border-2 border-red-400' 
-                      : 'bg-green-500/20 border-2 border-green-400'
+                      : `bg-green-500/20 border-2 ${getVolumeBorderColor()}`
                   }`}
                 >
                   {getVolumeIcon()}

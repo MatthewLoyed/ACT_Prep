@@ -89,7 +89,7 @@ export default function StudyBuddy({ streak, isCorrect, showMessage, onMessageCo
                  repeat: Infinity,
                  ease: "easeInOut"
                }}
-                               className={`${persistent ? 'w-16 h-16' : 'w-20 h-20'} bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer hover:scale-110 transition-transform`}
+                               className={`${persistent ? 'w-16 h-16' : 'w-20 h-20'} bg-gradient-to-br from-[#ffeaa7] to-[#fdcb6e] rounded-full flex items-center justify-center shadow-lg border-4 border-white cursor-pointer hover:scale-110 transition-transform`}
                onClick={() => {
                  if (persistent) {
                    setCurrentMessage("Keep going! You're doing great! 💪")
@@ -98,7 +98,7 @@ export default function StudyBuddy({ streak, isCorrect, showMessage, onMessageCo
                }}
              >
                              {isCelebrating ? (
-                 <Trophy className={`${persistent ? 'w-8 h-8' : 'w-10 h-10'} text-yellow-300`} weight="fill" />
+                 <Trophy className={`${persistent ? 'w-8 h-8' : 'w-10 h-10'} text-[#ffeaa7]`} weight="fill" />
                ) : streak >= 5 ? (
                  <Brain className={`${persistent ? 'w-8 h-8' : 'w-10 h-10'} text-white`} weight="fill" />
                ) : streak >= 3 ? (
@@ -154,7 +154,7 @@ export default function StudyBuddy({ streak, isCorrect, showMessage, onMessageCo
                       duration: 1,
                       delay: i * 0.1
                     }}
-                    className="absolute top-1/2 left-1/2 w-2 h-2 bg-yellow-400 rounded-full"
+                    className="absolute top-1/2 left-1/2 w-2 h-2 bg-[#ffeaa7] rounded-full"
                   />
                 ))}
               </motion.div>

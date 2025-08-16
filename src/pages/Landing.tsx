@@ -22,9 +22,53 @@ const faqs = [
 
 export default function Landing() {
   return (
-    <div className="py-16">
+    <div className="py-16 relative overflow-hidden">
+      {/* Dynamic Floating Brains */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(30)].map((_, i) => {
+          // Create random starting positions across the entire screen
+          const startX = Math.random() * 100
+          const startY = Math.random() * 100
+          
+          return (
+            <motion.div
+              key={i}
+              className="absolute"
+              initial={{
+                x: 0,
+                y: 0,
+                opacity: 0.4,
+                scale: 0.6
+              }}
+              animate={{
+                x: [0, 300, 600, 900, 1200, 900, 600, 300, 0, -300, 0],
+                y: [0, 200, 400, 600, 800, 600, 400, 200, 0, -200, 0],
+                opacity: [0.4, 0.8, 0.4],
+                scale: [0.6, 1, 0.6],
+                rotate: [0, 180, 360]
+              }}
+              transition={{
+                duration: 35 + Math.random() * 25,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              style={{
+                left: `${startX}%`,
+                top: `${startY}%`
+              }}
+            >
+              <img 
+                src="/images/yellowBrain.png" 
+                alt="Floating Brain" 
+                className="w-7 h-7 opacity-30"
+              />
+            </motion.div>
+          )
+        })}
+      </div>
+
       {/* Hero */}
-      <div className="container grid place-items-center">
+      <div className="container grid place-items-center relative z-10">
         <div className="max-w-4xl text-center">
           <BlurText
             text="ACT® Prep that feels fun"
@@ -36,7 +80,7 @@ export default function Landing() {
           />
           <TextType
             text={[
-              "Skip the stale PDFs. Practice one question at a time with lively feedback, a clean UI, and smooth microanimations.",
+              "Skip the stale PDFs. Practice with lively feedback and smooth animations.",
               "Master the ACT® with interactive practice sessions that adapt to your learning style.",
               "Transform test prep from boring to engaging with our modern, gamified approach."
             ]}

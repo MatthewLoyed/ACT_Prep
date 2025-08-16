@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+import { loadTestFromLocalStorage } from '../lib/localTestStore'
 import { useEffect, useState } from 'react'
 import { 
   BookOpen,
@@ -10,62 +10,48 @@ import {
   ClipboardText
 } from '@phosphor-icons/react'
 import EngagingLoader from '../components/EngagingLoader'
+import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
 
-const subjects = [
-  { 
-    id: 'english', 
+// Subject configuration with icons and colors
+const subjectConfig = {
+  english: { 
     title: 'English', 
     color: 'from-rose-400 to-rose-600', 
-    icon: BookOpen,
-    blurb: 'Grammar, usage, punctuation, and rhetorical skills.',
-    time: '35 minutes',
-    questions: '50 questions'
+    icon: BookOpen
   },
-  { 
-    id: 'math', 
+  math: { 
     title: 'Math', 
     color: 'from-emerald-400 to-emerald-600', 
-    icon: Calculator,
-    blurb: 'Algebra, geometry, functions, and number sense.',
-    time: '50 minutes',
-    questions: '45 questions'
+    icon: Calculator
   },
-  { 
-    id: 'reading', 
+  reading: { 
     title: 'Reading', 
-    color: 'from-emerald-400 to-emerald-600', 
-    icon: FileText,
-    blurb: 'Comprehension, inference, and author\'s purpose.',
-    time: '40 minutes',
-    questions: '36 questions'
+    color: 'from-blue-400 to-blue-600', 
+    icon: FileText
   },
-  // Science coming soon
-  { 
-    id: 'science', 
+  science: { 
     title: 'Science', 
     color: 'from-teal-400 to-teal-600', 
-    icon: Flask,
-    blurb: 'Data interpretation, experiment design, and reasoning.',
-    time: '40 minutes',
-    questions: '40 questions',
-    comingSoon: true
-  },
-]
+    icon: Flask
+  }
+}
 
-const fullTestOption = {
+// Full test option will be populated dynamically based on test type
+const getFullTestOption = (testConfig: TestTypeConfig) => ({
   id: 'full', 
   title: 'Full Test', 
-      color: 'from-cyan-400 to-cyan-600', 
+  color: 'from-cyan-400 to-cyan-600', 
   icon: ClipboardText,
-  blurb: 'Complete ACT® test with all sections and timing.',
-  time: '2 hours 55 minutes',
-  questions: 'All sections'
-}
+  blurb: `Complete ${testConfig.name} with all sections and timing.`,
+  time: testConfig.totalTime,
+  questions: `${testConfig.totalQuestions} questions`
+})
 
 export default function TestSelection() {
   const { testId } = useParams()
   const navigate = useNavigate()
   const [test, setTest] = useState<any>(null)
+  const [testConfig, setTestConfig] = useState<TestTypeConfig | null>(null)
   const [loading, setLoading] = useState(true)
   
   useEffect(() => {
@@ -77,8 +63,14 @@ export default function TestSelection() {
   const loadTest = async () => {
     try {
       setLoading(true)
-      const loadedTest = await loadTestFromSupabase(testId!)
+      const loadedTest = await loadTestFromLocalStorage(testId!)
       setTest(loadedTest)
+      
+      // Determine test type and get configuration
+      if (loadedTest) {
+        const config = getTestTypeConfig(loadedTest)
+        setTestConfig(config)
+      }
     } catch (error) {
       console.error('Failed to load test:', error)
     } finally {
@@ -132,6 +124,25 @@ export default function TestSelection() {
     navigate(`/pdf-practice/${subjectId}?testId=${testId}`)
   }
 
+  if (!testConfig) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <EngagingLoader 
+          message="Loading test configuration..." 
+          size="lg"
+          showThinking={true}
+        />
+      </div>
+    )
+  }
+
+  const fullTestOption = getFullTestOption(testConfig)
+  const subjects = Object.entries(testConfig.subjects).map(([id, config]) => ({
+    id,
+    ...subjectConfig[id as keyof typeof subjectConfig],
+    ...config
+  }))
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -139,9 +150,22 @@ export default function TestSelection() {
       transition={{ duration: 0.5 }}
       className="max-w-4xl mx-auto"
     >
+      {/* Back to Practice button - top left */}
+      <div className="mb-6">
+        <button 
+          className="btn btn-ghost hover:bg-slate-100 dark:hover:bg-slate-800 transform hover:scale-105 transition-all duration-200" 
+          onClick={() => navigate('/practice')}
+        >
+          ← Back to Practice
+        </button>
+      </div>
+      
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold">Choose a subject</h2>
-        <p className="text-slate-600 dark:text-slate-400">Select which section of "{test.name}" you want to practice</p>
+        <h1 className="text-4xl font-bold mb-2">{testConfig.name}</h1>
+        <h2 className="text-xl text-slate-600 dark:text-slate-400 mb-4">{test.name}</h2>
+        <p className="text-lg text-slate-500 dark:text-slate-400">
+          Choose a subject to practice
+        </p>
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -165,7 +189,7 @@ export default function TestSelection() {
                 <div className={`card overflow-hidden transition-all duration-300 ${isAvailable ? 'hover:shadow-xl group-hover:-translate-y-2 hover:scale-105' : ''}`}>
                   <div className={`h-32 bg-gradient-to-br ${s.color} relative overflow-hidden flex items-center justify-center`}>
                     <s.icon className="w-12 h-12 text-white" weight="fill" />
-                    {s.comingSoon && (
+                    {s.id === 'science' && !test.sections?.science && (
                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                         <span className="text-white font-bold text-lg">Coming Soon</span>
                       </div>
@@ -176,15 +200,15 @@ export default function TestSelection() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xl font-semibold">{s.title}</h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          {s.time} • {s.questions}
-                        </p>
+                                                 <p className="text-sm text-slate-600 dark:text-slate-400">
+                           {s.time} • {s.questions} questions
+                         </p>
                       </div>
                       {isAvailable && (
                         <span className="opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-1 text-2xl">→</span>
                       )}
                     </div>
-                    <p className="text-slate-700 dark:text-slate-300">{s.blurb}</p>
+                    <p className="text-slate-700 dark:text-slate-300">{s.description}</p>
                     
                     {isAvailable ? (
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -193,7 +217,7 @@ export default function TestSelection() {
                         </span>
                         <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5">PDF Practice</span>
                       </div>
-                    ) : s.comingSoon ? (
+                    ) : s.id === 'science' && !test.sections?.science ? (
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                         <span className="inline-block rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-2 py-0.5">
                           Coming Soon
@@ -263,15 +287,6 @@ export default function TestSelection() {
             </div>
           </button>
         </motion.div>
-      </div>
-      
-      <div className="mt-8 text-center">
-        <button 
-          className="btn btn-ghost btn-lg hover:bg-slate-100 dark:hover:bg-slate-800 transform hover:scale-105 transition-all duration-200" 
-          onClick={() => navigate('/practice')}
-        >
-          ← Back to Practice
-        </button>
       </div>
     </motion.div>
   )

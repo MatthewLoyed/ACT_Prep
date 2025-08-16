@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listTestsFromSupabase, setActiveTestId, getActiveTestId, clearAllTestsFromSupabase } from '../lib/supabaseTestStore'
+import { listTestsFromLocalStorage, setActiveTestId, getActiveTestId, clearAllTestsFromLocalStorage } from '../lib/localTestStore'
 
 export default function ChooseTest() {
   const navigate = useNavigate()
@@ -15,7 +15,7 @@ export default function ChooseTest() {
   const loadTests = async () => {
     try {
       setLoading(true)
-      const testsList = await listTestsFromSupabase()
+      const testsList = await listTestsFromLocalStorage()
       setTests(testsList)
     } catch (error) {
       console.error('Failed to load tests:', error)

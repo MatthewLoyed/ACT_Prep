@@ -68,9 +68,9 @@ export default function TestCompletionCelebration({
   }
 
   const getScoreIcon = () => {
-    if (percentage >= 90) return <Trophy className="w-16 h-16 text-yellow-300" weight="fill" />
+    if (percentage >= 90) return <Trophy className="w-16 h-16 text-[#ffeaa7]" weight="fill" />
     if (percentage >= 80) return <Star className="w-16 h-16 text-emerald-300" weight="fill" />
-    if (percentage >= 70) return <Brain className="w-16 h-16 text-yellow-300" weight="fill" />
+    if (percentage >= 70) return <Brain className="w-16 h-16 text-[#ffeaa7]" weight="fill" />
     if (percentage >= 60) return <Target className="w-16 h-16 text-purple-300" weight="fill" />
     if (percentage >= 50) return <CheckCircle className="w-16 h-16 text-orange-300" weight="fill" />
     return <Target className="w-16 h-16 text-red-300" weight="fill" />

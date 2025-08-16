@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
-import { loadTestFromSupabase } from '../lib/supabaseTestStore'
+// Use CDN worker to avoid version mismatch issues
+import { loadTestFromLocalStorage } from '../lib/localTestStore'
 import type { TestBundle } from '../lib/testStore'
 import { cleanMathText } from '../lib/actParser'
+import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
 
 // Define types locally
 type SectionId = 'english' | 'math' | 'reading' | 'science'
@@ -18,6 +17,10 @@ import EngagingLoader from '../components/EngagingLoader'
 import TestCompletionCelebration from '../components/TestCompletionCelebration'
 import AnimatedCounter from '../components/AnimatedCounter'
 
+// Use local worker to avoid CDN issues
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 GlobalWorkerOptions.workerSrc = pdfWorker
 
 type Question = {
@@ -39,12 +42,14 @@ export default function PdfPractice() {
   // console.log(`PdfPractice: Current subject = ${subject}, testId = ${testId}`)
 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [pageNum, setPageNum] = useState<number>(1)
   const [zoom, setZoom] = useState<number>(1.5)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const leftPaneRef = useRef<HTMLDivElement | null>(null)
 
   const [active, setActive] = useState<TestBundle | null>(null)
+  const [testConfig, setTestConfig] = useState<TestTypeConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Load test from Supabase
@@ -59,10 +64,18 @@ export default function PdfPractice() {
       try {
         setLoading(true)
         // PDF debug removed
-        const loadedTest = await loadTestFromSupabase(testId)
+        const loadedTest = await loadTestFromLocalStorage(testId)
         console.log('PDF DEBUG: Test loaded:', loadedTest)
         console.log('PDF DEBUG: Has PDF data:', !!loadedTest?.pdfData)
-        setActive(loadedTest)
+        if (loadedTest) {
+          setActive(loadedTest)
+          
+          // Determine test type and get configuration
+          const config = getTestTypeConfig(loadedTest)
+          setTestConfig(config)
+        } else {
+          setActive(null)
+        }
       } catch (error) {
         console.error('PDF DEBUG: Failed to load test:', error)
         setActive(null)
@@ -82,15 +95,14 @@ export default function PdfPractice() {
     
     const questions = fromActive ?? fallback
     
-    // Debug: Check if questions have answers
+    // Debug: Show what questions the parser provided
     if (questions.length > 0) {
       const questionsWithAnswers = questions.filter(q => q.answerIndex !== undefined)
-      console.log(`PRACTICE DEBUG: ${subject} section loaded ${questions.length} questions`)
-      console.log(`PRACTICE DEBUG: ${questionsWithAnswers.length} questions have answers`)
+      console.log(`PRACTICE DEBUG: ${subject} section loaded ${questions.length} questions from parser (${questionsWithAnswers.length} with answers)`)
       
       // Show first few questions with their answers
       questions.slice(0, 3).forEach((q, i) => {
-        console.log(`PRACTICE DEBUG: Question ${i + 1}: ID=${q.id}, Answer=${q.answerIndex}, Choices=${q.choices.length}`)
+        console.log(`PRACTICE DEBUG: Question ${i + 1}: ID=${q.id}, Answer=${q.answerIndex}, Choices=${q.choices.length}, Prompt="${q.prompt.substring(0, 50)}..."`)
       })
     }
     
@@ -111,7 +123,33 @@ export default function PdfPractice() {
   const [showCompletionCelebration, setShowCompletionCelebration] = useState<boolean>(false)
   const [lastManualAdvance, setLastManualAdvance] = useState<number | null>(null)
   const [isPageDetectionRunning, setIsPageDetectionRunning] = useState(false)
-  const [currentPageText, setCurrentPageText] = useState<string>('')
+  
+  // Timer functionality
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(false)
+  const [timerPaused, setTimerPaused] = useState<boolean>(false)
+  const [timerMinutes, setTimerMinutes] = useState<number>(0)
+  const [timeRemaining, setTimeRemaining] = useState<number>(0)
+  const [showTimerSetup, setShowTimerSetup] = useState<boolean>(false)
+  const [showTimeUp, setShowTimeUp] = useState<boolean>(false)
+
+  // Timer effect
+  useEffect(() => {
+    if (!timerEnabled || timeRemaining <= 0 || timerPaused) return
+    
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setShowTimeUp(true)
+          setTimerEnabled(false)
+          setTimerPaused(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    
+    return () => clearInterval(interval)
+  }, [timerEnabled, timeRemaining, timerPaused])
 
   // Reset all state when subject changes to prevent data corruption
   useEffect(() => {
@@ -122,7 +160,6 @@ export default function PdfPractice() {
     setQIdx(0)
     setTestCompleted(false)
     setLastManualAdvance(null)
-    setCurrentPageText('')
     setStreak(0) // Reset streak when changing subjects
     setShowStreakMessage(false) // Hide any existing streak message
     // Reset page number to 1, will be updated by the section detection useEffect
@@ -133,6 +170,7 @@ export default function PdfPractice() {
   useEffect(() => {
     if (!testId || !active) {
       setPdf(null)
+      setPdfLoading(false)
       return
     }
     
@@ -141,9 +179,11 @@ export default function PdfPractice() {
     if (!active.pdfData) {
       console.log('PDF DEBUG: No PDF data found in test')
       setPdf(null)
+      setPdfLoading(false)
       return
     }
     
+    setPdfLoading(true)
     let cancelled = false
     
     try {
@@ -173,17 +213,23 @@ export default function PdfPractice() {
         if (!cancelled) {
           console.log('PDF DEBUG: PDF loaded successfully, pages:', doc.numPages)
           setPdf(doc) 
+          setPdfLoading(false) // PDF loading is complete
         }
       }).catch(err => {
         console.error('PDF DEBUG: Error loading PDF:', err)
         setPdf(null)
+        setPdfLoading(false)
       })
     } catch (err) {
       console.error('PDF DEBUG: Error converting PDF data:', err)
       setPdf(null)
+      setPdfLoading(false)
     }
     
-    return () => { cancelled = true }
+    return () => { 
+      cancelled = true 
+      setPdfLoading(false)
+    }
   }, [testId, active])
 
   // Jump to first real question page on load
@@ -242,8 +288,6 @@ export default function PdfPractice() {
       const text = (content.items as PDFTextItem[]).map((it) => it.str).join('\n')
       
       if (!mounted) return
-      setCurrentPageText(text)
-      
       
       // Check for test ending - allow completion of questions on the final page
       const hasEndOfTest = 
@@ -253,7 +297,7 @@ export default function PdfPractice() {
       
       // Debug: log when we see "END OF TEST" 
       if (hasEndOfTest) {
-        // console.log(`Page ${pageNum}: Found "END OF TEST" with questions [${questionNumbers.join(', ')}]`)
+        // console.log(`Page ${pageNum}: Found "END OF TEST"`)
       }
 
       // Clear manual advance flag after a delay
@@ -322,11 +366,13 @@ export default function PdfPractice() {
   }, [correctAudio, wrongAudio])
 
   const pageQuestions: Question[] = useMemo(() => {
-    // Get questions for the current page using the stored pageQuestions mapping
+    // Get questions for the current page using the stored pageQuestions mapping from parser
     const subjectPageQuestions = active?.pageQuestions?.[subject as SectionId]
+    
     if (subjectPageQuestions && subjectPageQuestions[pageNum]) {
       const questionIds = subjectPageQuestions[pageNum]
-      return allQuestions.filter(q => questionIds.includes(q.id))
+      const questionsForThisPage = allQuestions.filter(q => questionIds.includes(q.id))
+      return questionsForThisPage
     }
     // Fallback: return all questions if no page mapping is available
     return allQuestions
@@ -407,6 +453,18 @@ export default function PdfPractice() {
     const m = current.id.match(/(\d+)/)
     return m ? Number(m[1]) : null
   }, [current])
+  
+  // Debug current question
+  useEffect(() => {
+    if (current && currentNum === 2 && subject === 'math') {
+      console.log(`=== MATH QUESTION 2 FULL TEXT ===`)
+      console.log(`ID: ${current.id}`)
+      console.log(`Prompt: "${current.prompt}"`)
+      console.log(`Choices:`, current.choices)
+      console.log(`Choice Letters:`, current.choiceLetters)
+      console.log(`=== END MATH QUESTION 2 ===`)
+    }
+  }, [current, currentNum, subject])
 
   return (
     <motion.div 
@@ -429,13 +487,16 @@ export default function PdfPractice() {
           </button>
           <div className="text-center flex-1">
             <h1 className="text-3xl font-bold tracking-wide">
-              {subject?.toUpperCase()} TEST
+              {testConfig ? `${testConfig.name} - ${subject?.toUpperCase()}` : `${subject?.toUpperCase()} TEST`}
             </h1>
             <p className="text-emerald-100 mt-1">
-              {subject === 'english' && '35 Minutes — 50 Questions'}
-              {subject === 'math' && '50 Minutes — 45 Questions'}
-              {subject === 'reading' && '40 Minutes — 36 Questions'}
-              {subject === 'science' && '40 Minutes — 40 Questions'}
+              {testConfig ? 
+                `${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.time} — ${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions} Questions` :
+                (subject === 'english' && '35 Minutes — 50 Questions') ||
+                (subject === 'math' && '50 Minutes — 45 Questions') ||
+                (subject === 'reading' && '40 Minutes — 36 Questions') ||
+                (subject === 'science' && '40 Minutes — 40 Questions')
+              }
             </p>
           </div>
           <div className="w-24"></div> {/* Spacer to center the title */}
@@ -459,15 +520,68 @@ export default function PdfPractice() {
         <div className="text-center mt-2 text-sm text-emerald-100 font-semibold">
           {Object.keys(answers).length === allQuestions.length ? '🎉 All questions completed!' : 'Keep going!'}
         </div>
+        
+        {/* Timer UI */}
+        <div className="flex items-center justify-center gap-4 mt-4">
+          {!timerEnabled && !showTimeUp && (
+            <button
+              className="btn btn-sm btn-outline text-white border-white/30 hover:bg-white/20"
+              onClick={() => setShowTimerSetup(true)}
+            >
+              ⏱️ Set Timer
+            </button>
+          )}
+          
+          {timerEnabled && timeRemaining > 0 && (
+            <div className="flex items-center gap-2 text-white">
+              <span className="text-lg">⏱️</span>
+              <span className="font-mono text-lg font-bold">
+                {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+              </span>
+              <button
+                className="btn btn-sm btn-ghost text-white hover:bg-white/20"
+                onClick={() => {
+                  setTimerPaused(!timerPaused)
+                }}
+              >
+                {timerPaused ? '▶️ Resume' : '⏸️ Pause'}
+              </button>
+              <button
+                className="btn btn-sm btn-ghost text-white hover:bg-white/20"
+                onClick={() => {
+                  setTimerEnabled(false)
+                  setTimerPaused(false)
+                  setTimeRemaining(0)
+                }}
+              >
+                Stop
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="flex-1 grid lg:grid-cols-[2fr_1fr] gap-6 p-4">
         {loading ? (
           <div className="col-span-2 card p-8 text-center">
-            <div className="text-4xl mb-4">⏳</div>
-            <h2 className="text-2xl font-bold mb-4">Loading Test...</h2>
-            <p className="text-secondary mb-6">
+            <EngagingLoader 
+              message="Loading Test..." 
+              size="lg"
+              showThinking={true}
+            />
+            <p className="text-secondary mt-4">
               Please wait while we load your test from the database.
+            </p>
+          </div>
+        ) : pdfLoading ? (
+          <div className="col-span-2 card p-8 text-center">
+            <EngagingLoader 
+              message="Loading PDF..." 
+              size="lg"
+              showThinking={true}
+            />
+            <p className="text-secondary mt-4">
+              Please wait while we load your test PDF.
             </p>
           </div>
         ) : !pdf ? (
@@ -477,7 +591,7 @@ export default function PdfPractice() {
             <p className="text-secondary mb-6">
               {!testId ? 'No test selected. Please select a test first.' : 
                !active?.pdfData ? 'This test does not have PDF data. Please re-import the test.' :
-               'Loading PDF... Please wait.'}
+               'PDF failed to load. Please try again.'}
             </p>
             <div className="flex gap-3 justify-center">
               <button 
@@ -567,24 +681,6 @@ export default function PdfPractice() {
                   )}
                 </div>
               )}
-              {/* Debug info - commented out
-      
-              <div className="mt-2 text-xs opacity-60">Current: Question {currentNum} of {pageQuestions.length}</div>
-              <div className="mt-2 text-xs opacity-60">Subject: {subject}</div>
-              {subject === 'math' && (
-                <div className="mt-2 text-xs opacity-60">
-                  Math Debug: {pageQuestions.length} questions loaded
-                </div>
-              )}
-              {current && subject === 'math' && (
-                <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs">
-                  <div>Question {currentNum}: {current.prompt.substring(0, 50)}...</div>
-                  <div>Answer Index: {current.answerIndex !== undefined ? current.answerIndex : 'Not set'}</div>
-                  <div>Answer Letter: {current.answerIndex !== undefined && current.choiceLetters?.[current.answerIndex] ? current.choiceLetters[current.answerIndex] : 'Not set'}</div>
-                  <div>Choices: {current.choices.length}</div>
-                </div>
-              )}
-              */}
             </div>
             
             {/* Navigation for pages with no questions (like reading passage pages) */}
@@ -611,7 +707,6 @@ export default function PdfPractice() {
                       onClick={() => {
                         if (pdf && pageNum < pdf.numPages) {
                           const nextPage = Math.min(pdf.numPages, pageNum + 1)
-                          // console.log(`READING DEBUG: Manual navigation from page ${pageNum} to page ${nextPage}`)
                           setLastManualAdvance(nextPage)
                           setPageNum(nextPage)
                         }
@@ -628,7 +723,7 @@ export default function PdfPractice() {
             {current && (
               <motion.div
                 key={current.id}
-                className="card p-4 max-h-[75vh] overflow-y-auto"
+                className="card p-4 min-h-[85vh]"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
@@ -688,7 +783,7 @@ export default function PdfPractice() {
                     
                     return (
                       <button key={i} className={`choice ${state}`} onClick={() => onAnswer(current.id, i, current.answerIndex)} disabled={disabled}>
-                        <span className="font-medium mr-2">{choiceLetter}.</span>
+                        <span className="font-medium mr-2">{choiceLetter.replace(/\.$/, '')}.</span>
                         {cleanMathText(current.choices[i] || '')}
                         {userAnswered && thisIsCorrect && !userSelectedThis && (
                           <span className="ml-2 text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 px-2 py-1 rounded">
@@ -769,19 +864,13 @@ export default function PdfPractice() {
                           
                           // If all answered, check if this is the final question of the test
                           const isLastQuestion = 
-                            (subject === 'english' && currentNum === 50) ||
-                            (subject === 'math' && currentNum === 45) ||
-                            (subject === 'reading' && currentNum === 36)
+                            (subject === 'english' && currentNum === 75) ||
+                            (subject === 'math' && currentNum === 60) ||
+                            (subject === 'reading' && currentNum === 40)
                           
-                          // Check if we're on a page with "END OF TEST" text
-                          const hasEndOfTest = 
-                            (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
-                            (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
-                            (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
-                          
-                          // End test if we've reached the last question OR completed all questions on END OF TEST page
-                          if (allAnswered && (isLastQuestion || hasEndOfTest)) {
-                            console.log(`${subject.toUpperCase()} test completed - ${isLastQuestion ? 'reached last question' : 'completed all questions on END OF TEST page'}`)
+                          // End test if we've reached the last question
+                          if (allAnswered && isLastQuestion) {
+                            console.log(`${subject.toUpperCase()} test completed - reached last question`)
                             // Play level up sound for test completion
                             const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
                             levelUpAudio.play().catch(() => {})
@@ -789,8 +878,8 @@ export default function PdfPractice() {
                             return i
                           }
                           
-                          // Otherwise, advance to next page if all questions are answered
-                          if (allAnswered && pdf && pageNum < pdf.numPages) {
+                          // Otherwise, advance to next page if all questions are answered AND user is on last question of page
+                          if (allAnswered && i === pageQuestions.length - 1 && pdf && pageNum < pdf.numPages) {
                             // Find the next page that has questions for this subject
                             let nextPage = pageNum + 1
                             while (nextPage <= pdf.numPages) {
@@ -813,26 +902,32 @@ export default function PdfPractice() {
                           return i
                         })
                       }}
-                      disabled={answers[current?.id] === undefined}
+                      disabled={(() => {
+                        const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
+                        const isLastQuestionOnPage = qIdx === pageQuestions.length - 1
+                        
+                        // Button is disabled if:
+                        // 1. Current question is not answered, OR
+                        // 2. All questions are answered but user is not on last question of page
+                        return answers[current?.id] === undefined || 
+                               (allAnswered && !isLastQuestionOnPage)
+                      })()}
                     >
                     {(() => {
                       const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
+                      const isLastQuestionOnPage = qIdx === pageQuestions.length - 1
                       const isLastQuestion = 
-                        (subject === 'english' && currentNum === 50) ||
-                        (subject === 'math' && currentNum === 45) ||
-                        (subject === 'reading' && currentNum === 36)
-                      const hasEndOfTest = 
-                        (subject === 'english' && /END OF TEST 1/i.test(currentPageText)) ||
-                        (subject === 'math' && /END OF TEST 2/i.test(currentPageText)) ||
-                        (subject === 'reading' && /END OF TEST 3/i.test(currentPageText))
+                        (subject === 'english' && currentNum === 75) ||
+                        (subject === 'math' && currentNum === 60) ||
+                        (subject === 'reading' && currentNum === 40)
                       
                       // Check if this is the final question of the test
-                      if (allAnswered && (isLastQuestion || hasEndOfTest)) {
+                      if (allAnswered && isLastQuestion) {
                         return 'See Results'
                       }
                       
-                      // Check if all questions on current page are answered
-                      if (allAnswered) {
+                      // Check if all questions on current page are answered AND user is on last question of page
+                      if (allAnswered && isLastQuestionOnPage) {
                         return 'Next Page'
                       }
                       
@@ -850,22 +945,23 @@ export default function PdfPractice() {
         )}
       </div>
       
-      {/* Visual Enhancement Components */}
-      <StudyBuddy 
-        streak={streak}
-        isCorrect={feedback?.ok || false}
-        showMessage={showStudyBuddy}
-        onMessageComplete={() => setShowStudyBuddy(false)}
-      />
-      
-      {/* Persistent Study Buddy */}
-      <StudyBuddy 
-        streak={streak}
-        isCorrect={false}
-        showMessage={false}
-        onMessageComplete={() => {}}
-        persistent={true}
-      />
+      {/* Study Buddy - Show celebration version when active, otherwise show persistent */}
+      {showStudyBuddy ? (
+        <StudyBuddy 
+          streak={streak}
+          isCorrect={feedback?.ok || false}
+          showMessage={showStudyBuddy}
+          onMessageComplete={() => setShowStudyBuddy(false)}
+        />
+      ) : (
+        <StudyBuddy 
+          streak={streak}
+          isCorrect={false}
+          showMessage={false}
+          onMessageComplete={() => {}}
+          persistent={true}
+        />
+      )}
       
       <SuccessCelebration 
         show={showSuccessCelebration}
@@ -889,6 +985,111 @@ export default function PdfPractice() {
         totalQuestions={allQuestions.length}
         correctAnswers={allQuestions.filter(q => answers[q.id] === q.answerIndex).length}
       />
+
+      {/* Timer Setup Modal */}
+      <AnimatePresence>
+        {showTimerSetup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 grid place-items-center bg-black/40 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              className="card p-6 text-center max-w-md mx-4"
+            >
+              <div className="text-2xl mb-4">⏱️</div>
+              <div className="text-xl font-semibold mb-4">Set Timer</div>
+              <div className="text-sm text-secondary mb-6">
+                Choose how many minutes to practice {subject}
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">Minutes (0 for no timer)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="180"
+                  value={timerMinutes}
+                  onChange={(e) => setTimerMinutes(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900"
+                  placeholder="Enter minutes"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  className="btn btn-ghost flex-1"
+                  onClick={() => setShowTimerSetup(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary flex-1"
+                  onClick={() => {
+                    if (timerMinutes > 0) {
+                      setTimeRemaining(timerMinutes * 60)
+                      setTimerEnabled(true)
+                    }
+                    setShowTimerSetup(false)
+                  }}
+                >
+                  Start Timer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Time's Up Modal */}
+      <AnimatePresence>
+        {showTimeUp && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 grid place-items-center bg-black/40 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              className="card p-6 text-center max-w-md mx-4"
+            >
+              <div className="text-4xl mb-4">⏰</div>
+              <div className="text-2xl font-semibold mb-4">Time's Up!</div>
+              <div className="text-sm text-secondary mb-6">
+                Your timer has expired. You can continue practicing or review your answers.
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  className="btn btn-ghost flex-1"
+                  onClick={() => setShowTimeUp(false)}
+                >
+                  Continue
+                </button>
+                <button
+                  className="btn btn-primary flex-1"
+                  onClick={() => {
+                    setShowTimeUp(false)
+                    const answersParam = encodeURIComponent(JSON.stringify(answers))
+                    navigate(`/test-review/${subject}?testId=${testId}&answers=${answersParam}`)
+                  }}
+                >
+                  Review Answers
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </motion.div>
   )

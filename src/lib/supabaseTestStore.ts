@@ -149,7 +149,6 @@ export async function listTestsFromSupabase(): Promise<TestBundle[]> {
     
     // Convert to TestBundle format (without PDF data for list view)
     const tests: TestBundle[] = testRecords.map(record => {
-      console.log(`Supabase Debug: Test "${record.name}" sections from DB:`, record.sections)
       return {
         id: record.id,
         name: record.name,

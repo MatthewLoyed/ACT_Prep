@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { listTestsFromSupabase } from '../lib/supabaseTestStore'
+import { listTestsFromLocalStorage } from '../lib/localTestStore'
 import ProgressCircle from '../components/ProgressCircle'
+import { 
+  getAchievementProgress, 
+  type UserStats, 
+  type Achievement,
+  addNewAchievements,
+  checkAchievements
+} from '../lib/achievements'
 
 type SectionKey = 'english' | 'math' | 'reading' | 'science'
 
@@ -30,15 +37,27 @@ export default function History() {
     loadData()
   }, [])
 
+  // Check for new achievements when data loads
+  useEffect(() => {
+    if (!loading) {
+      const stats = calculateUserStats()
+      const newAchievements = checkAchievements(stats)
+      if (newAchievements.length > 0) {
+        addNewAchievements(newAchievements)
+        console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
+      }
+    }
+  }, [loading, sessions, tests])
+
   const loadData = async () => {
     try {
       // Load sessions from localStorage (legacy data)
       const stored = JSON.parse(localStorage.getItem('sessions') ?? '[]') as Session[]
       setSessions(stored)
       
-      // Load tests from Supabase
-      const supabaseTests = await listTestsFromSupabase()
-      setTests(supabaseTests)
+      // Load tests from localStorage
+      const localTests = await listTestsFromLocalStorage()
+      setTests(localTests)
     } catch (error) {
       console.error('Error loading history data:', error)
     } finally {
@@ -93,6 +112,38 @@ export default function History() {
     return sum + Object.values(test.sections).reduce((sectionSum: number, section: any) => sectionSum + (section?.length || 0), 0)
   }, 0)
 
+  // Calculate user stats for achievements
+  const calculateUserStats = (): UserStats => {
+    const sectionCounts = {
+      english: sessions.filter(s => s.section === 'english').reduce((sum, s) => sum + s.total, 0),
+      math: sessions.filter(s => s.section === 'math').reduce((sum, s) => sum + s.total, 0),
+      reading: sessions.filter(s => s.section === 'reading').reduce((sum, s) => sum + s.total, 0),
+      science: sessions.filter(s => s.section === 'science').reduce((sum, s) => sum + s.total, 0)
+    }
+
+    const scores = sessions.map(s => (s.rawScore / s.total) * 100).filter(score => !isNaN(score))
+    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+    const bestScore = scores.length > 0 ? Math.max(...scores) : 0
+    const perfectScores = scores.filter(score => score === 100).length
+
+    // Calculate consecutive days (simplified - just count unique dates)
+    const uniqueDates = new Set(sessions.map(s => new Date(s.date).toDateString()))
+    const consecutiveDays = uniqueDates.size
+
+    return {
+      totalQuestions: overallTotal,
+      totalSessions: sessions.length,
+      totalTime: Math.round(overallTime / 60), // Convert to minutes
+      averageScore,
+      bestScore,
+      consecutiveDays,
+      testsImported: tests.length,
+      sectionsCompleted: sectionCounts,
+      perfectScores,
+      studyStreak: consecutiveDays // Simplified for now
+    }
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -120,6 +171,67 @@ export default function History() {
                 <div className="text-sm text-secondary">Total questions available</div>
                 <div className="text-4xl font-bold">{totalImportedQuestions}</div>
               </div>
+            </div>
+            
+            {/* Achievements Section */}
+            <div className="mt-8 card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Achievements</h3>
+                  <p className="text-secondary">Celebrate your progress and milestones!</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-[#ffeaa7]">
+                    {(() => {
+                      const stats = calculateUserStats()
+                      const progress = getAchievementProgress(stats)
+                      return `${progress.earnedCount}/${progress.total}`
+                    })()}
+                  </div>
+                  <div className="text-sm text-secondary">Badges Earned</div>
+                </div>
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {(() => {
+                  const stats = calculateUserStats()
+                  const progress = getAchievementProgress(stats)
+                  
+                  return progress.earned.map((achievement, index) => (
+                    <motion.div
+                      key={achievement.id}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-gradient-to-br from-[#ffeaa7]/20 to-[#fdcb6e]/20 border border-[#ffeaa7]/30 rounded-xl p-4 hover:scale-105 transition-transform"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-3xl">{achievement.icon}</div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-white">{achievement.title}</h4>
+                          <p className="text-sm text-secondary">{achievement.description}</p>
+                          {achievement.earnedAt && (
+                            <p className="text-xs text-[#ffeaa7] mt-1">
+                              Earned {new Date(achievement.earnedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                })()}
+              </div>
+              
+              {(() => {
+                const stats = calculateUserStats()
+                const progress = getAchievementProgress(stats)
+                return progress.earned.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-2">🏆</div>
+                    <p className="text-secondary">Complete your first question to earn your first achievement!</p>
+                  </div>
+                ) : null
+              })()}
             </div>
             
             {/* Progress Circles */}

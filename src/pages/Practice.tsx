@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { listTestsFromSupabase, setActiveTestId, deleteTestFromSupabase, clearAllTestsFromSupabase } from '../lib/supabaseTestStore'
+import { listTestsFromLocalStorage, setActiveTestId, deleteTestFromLocalStorage, clearAllTestsFromLocalStorage } from '../lib/localTestStore'
 import { 
   FileText,
   Trash,
@@ -32,7 +32,7 @@ export default function Practice() {
   const loadTests = async () => {
     try {
       setLoading(true)
-      const testsList = await listTestsFromSupabase()
+      const testsList = await listTestsFromLocalStorage()
       setTests(testsList as Test[])
     } catch (error) {
       console.error('Failed to load tests:', error)
@@ -128,15 +128,10 @@ export default function Practice() {
                           // Define the desired order
                           const desiredOrder = ['english', 'math', 'reading', 'science']
                           
-                          // Debug: log the sections data
-                          console.log(`Practice Debug: Test "${test.name}" sections:`, test.sections)
-                          
                           // Filter and sort sections in the desired order
                           return desiredOrder
                             .filter(section => test.sections[section])
                             .map(section => {
-                              const sectionData = test.sections[section]
-                              console.log(`Practice Debug: ${section} section data:`, sectionData, 'Type:', typeof sectionData, 'Length:', Array.isArray(sectionData) ? sectionData.length : 'Not an array')
                               return (
                                 <span 
                                   key={section}
@@ -159,7 +154,7 @@ export default function Practice() {
                             e.stopPropagation()
                             if (confirm('Are you sure you want to delete this test? This action cannot be undone.')) {
                               try {
-                                await deleteTestFromSupabase(test.id)
+                                await deleteTestFromLocalStorage(test.id)
                                 await loadTests() // Reload the tests list
                                 if (selectedTestId === test.id) {
                                   setSelectedTestId(null)
@@ -201,7 +196,7 @@ export default function Practice() {
                  onClick={async () => {
                    if (confirm('Are you sure you want to clear all tests? This action cannot be undone.')) {
                      try {
-                       await clearAllTestsFromSupabase()
+                       await clearAllTestsFromLocalStorage()
                        setTests([])
                        setSelectedTestId(null)
                        console.log('All tests cleared successfully from database')
