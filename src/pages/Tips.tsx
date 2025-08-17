@@ -162,7 +162,7 @@ export default function Tips() {
           className="card p-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <BookOpen className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
+            <BookOpen className="w-8 h-8 text-[var(--color-accent)]" weight="fill" />
             <h2 className="text-2xl font-bold text-white">Official ACT® Resources</h2>
           </div>
           
@@ -203,12 +203,12 @@ export default function Tips() {
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Lightbulb className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
+              <Lightbulb className="w-8 h-8 text-[var(--color-accent)]" weight="fill" />
               <h2 className="text-2xl font-bold text-white">Your Study Tips</h2>
             </div>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-xl hover:scale-105 transition-transform"
+              className="flex items-center gap-2 bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-dark)] text-[var(--color-text-dark)] font-bold py-2 px-4 rounded-xl hover:scale-105 transition-transform"
             >
               <Plus className="w-5 h-5" />
               Add Tip
@@ -239,7 +239,7 @@ export default function Tips() {
                 <button
                   onClick={addTip}
                   disabled={!newTip.trim()}
-                  className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-dark)] text-[var(--color-text-dark)] font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   Save Tip
@@ -270,7 +270,7 @@ export default function Tips() {
               </p>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-3 px-6 rounded-xl hover:scale-105 transition-transform mx-auto"
+                className="flex items-center gap-2 bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-dark)] text-[var(--color-text-dark)] font-bold py-3 px-6 rounded-xl hover:scale-105 transition-transform mx-auto"
               >
                 <Plus className="w-5 h-5" />
                 Add Your First Tip
@@ -301,7 +301,7 @@ export default function Tips() {
                      damping: 15
                    }}
                    className={`bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/20 group hover:bg-white/15 transition-all duration-200 ${
-                     tip.isPinned ? 'ring-2 ring-[#ffeaa7] ring-opacity-50 shadow-lg' : ''
+                     tip.isPinned ? 'ring-2 ring-[var(--color-accent)] ring-opacity-50 shadow-lg' : ''
                    }`}
                  >
                   {editingTipId === tip.id ? (
@@ -325,7 +325,7 @@ export default function Tips() {
                         <button
                           onClick={saveEdit}
                           disabled={!editingText.trim()}
-                          className="flex items-center gap-2 bg-gradient-to-r from-[#ffeaa7] to-[#fdcb6e] text-gray-800 font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-dark)] text-[var(--color-text-dark)] font-bold py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Save
                         </button>
@@ -346,7 +346,7 @@ export default function Tips() {
                       <div className="flex-1">
                         <div className="flex items-start gap-2">
                           {tip.isPinned && (
-                            <PushPin className="w-4 h-4 text-[#ffeaa7] mt-1 flex-shrink-0" weight="fill" />
+                            <PushPin className="w-4 h-4 text-[var(--color-accent)] mt-1 flex-shrink-0" weight="fill" />
                           )}
                           <p className="text-white text-lg leading-relaxed">{tip.text}</p>
                         </div>
@@ -357,7 +357,7 @@ export default function Tips() {
                                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                          <motion.button
                            onClick={() => editTip(tip.id)}
-                           className="p-2 text-[#ffeaa7] hover:text-[#fdcb6e] hover:bg-[#ffeaa7]/20 rounded-lg transition-colors"
+                           className="p-2 text-[var(--color-accent)] hover:text-[var(--color-accent-dark)] hover:bg-[var(--color-accent)]/20 rounded-lg transition-colors"
                            title="Edit tip"
                            whileHover={{ scale: 1.1 }}
                            whileTap={{ scale: 0.95 }}
@@ -368,8 +368,8 @@ export default function Tips() {
                            onClick={() => handlePinWithAnimation(tip.id)}
                            className={`p-2 rounded-lg transition-colors ${
                              tip.isPinned 
-                               ? 'text-[#ffeaa7] hover:text-[#fdcb6e] hover:bg-[#ffeaa7]/20' 
-                               : 'text-white/60 hover:text-[#ffeaa7] hover:bg-[#ffeaa7]/20'
+                               ? 'text-[var(--color-accent)] hover:text-[var(--color-accent-dark)] hover:bg-[var(--color-accent)]/20' 
+                               : 'text-white/60 hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20'
                            }`}
                            title={tip.isPinned ? 'Unpin tip' : 'Pin tip'}
                            whileHover={{ scale: 1.1 }}
@@ -413,7 +413,7 @@ export default function Tips() {
           className="card p-6"
         >
           <div className="flex items-center gap-3 mb-6">
-            <Star className="w-8 h-8 text-[#ffeaa7]" weight="fill" />
+            <Star className="w-8 h-8 text-[var(--color-accent)]" weight="fill" />
             <h2 className="text-2xl font-bold text-white">Quick Study Tips</h2>
           </div>
           

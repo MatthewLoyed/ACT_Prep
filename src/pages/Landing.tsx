@@ -69,7 +69,7 @@ export default function Landing() {
 
       {/* Hero */}
       <div className="container grid place-items-center relative z-10">
-        <div className="max-w-4xl text-center">
+        <div className="max-w-4xl text-center backdrop-blur-md">
           <BlurText
             text="ACT® Prep that feels fun"
             className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl mb-6"

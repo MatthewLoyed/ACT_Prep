@@ -16,22 +16,22 @@ import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
 const subjectConfig = {
   english: { 
     title: 'English', 
-    color: 'from-rose-400 to-rose-600', 
+    color: 'from-[var(--color-primary)] to-[var(--color-primary-dark)]', 
     icon: BookOpen
   },
   math: { 
     title: 'Math', 
-    color: 'from-emerald-400 to-emerald-600', 
+    color: 'from-[var(--color-accent)] to-[var(--color-accent-dark)]', 
     icon: Calculator
   },
   reading: { 
     title: 'Reading', 
-    color: 'from-blue-400 to-blue-600', 
+    color: 'from-[var(--color-primary-light)] to-[var(--color-primary)]', 
     icon: FileText
   },
   science: { 
     title: 'Science', 
-    color: 'from-teal-400 to-teal-600', 
+    color: 'from-[var(--color-accent-light)] to-[var(--color-accent)]', 
     icon: Flask
   }
 }
@@ -40,7 +40,7 @@ const subjectConfig = {
 const getFullTestOption = (testConfig: TestTypeConfig) => ({
   id: 'full', 
   title: 'Full Test', 
-  color: 'from-cyan-400 to-cyan-600', 
+  color: 'from-[var(--color-primary)] to-[var(--color-accent)]', 
   icon: ClipboardText,
   blurb: `Complete ${testConfig.name} with all sections and timing.`,
   time: testConfig.totalTime,

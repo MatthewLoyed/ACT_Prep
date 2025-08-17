@@ -60,7 +60,7 @@ export default function Practice() {
       className="max-w-5xl mx-auto"
     >
       <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
+        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] bg-clip-text text-transparent">
           Practice Tests
         </h2>
         <p className="text-xl text-secondary max-w-2xl mx-auto">
@@ -103,19 +103,14 @@ export default function Practice() {
             >
                                                                            <div className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
                   selectedTestId === test.id 
-                    ? 'ring-3 shadow-xl scale-[1.02]' 
+                    ? 'ring-2 ring-[var(--color-accent)] shadow-xl scale-[1.02] bg-gradient-to-br from-[var(--color-accent)]/10 to-[var(--color-accent-dark)]/10' 
                     : 'hover:shadow-lg'
                 }`} 
-                style={selectedTestId === test.id ? {
-                  background: 'linear-gradient(135deg, rgba(255, 234, 167, 0.1), rgba(253, 203, 110, 0.1))',
-                  borderColor: '#fdcb6e',
-                  boxShadow: '0 0 0 3px rgba(253, 203, 110, 0.3)'
-                } : {}}
                 onClick={() => handleTestSelect(test.id)}>
                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(45deg, #ffeaa7, #fdcb6e)' }}>
-                                              <FileText className="w-5 h-5 text-gray-800" weight="fill" />
+                    <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}>
+                                              <FileText className="w-5 h-5 text-[var(--color-text-dark)]" weight="fill" />
                     </div>
                     <div>
                       <div className="font-semibold text-lg">{test.name}</div>
@@ -147,7 +142,7 @@ export default function Practice() {
                   </div>
                                      {selectedTestId === test.id && (
                      <div className="flex items-center gap-2">
-                                                                                               <div className="text-gray-800 font-semibold px-3 py-1 rounded-full shadow-md" style={{ background: 'linear-gradient(45deg, #ffeaa7, #fdcb6e)' }}>✓ Selected</div>
+                                                                                               <div className="text-[var(--color-text-dark)] font-semibold px-3 py-1 rounded-full shadow-md" style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}>✓ Selected</div>
                                                                        <button 
                           className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2"
                           onClick={async (e) => {

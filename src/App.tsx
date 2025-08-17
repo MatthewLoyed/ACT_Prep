@@ -61,7 +61,7 @@ function App() {
     <BrowserRouter>
       <div className="min-h-dvh">
         <motion.header 
-          className="sticky top-0 z-10 glass-card shadow-lg"
+          className="sticky top-0 z-50 glass-card shadow-lg backdrop-blur-xl"
           initial={{ y: 0 }}
           animate={{ y: isNavVisible ? 0 : -100 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -72,6 +72,9 @@ function App() {
                 src="/images/yellowBrain.png" 
                 alt="Brain Logo" 
                 className="w-24 h-24 group-hover:scale-110 transition-transform duration-200"
+                style={{
+                  filter: 'var(--logo-filter, hue-rotate(0deg) saturate(0.8) brightness(1.1))'
+                }}
               />
               <span className="text-4xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200 whitespace-nowrap">
                 TestPrep Pro

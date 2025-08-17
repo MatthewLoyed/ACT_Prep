@@ -5,6 +5,7 @@ import {
   SpeakerSlash, 
   SpeakerLow
 } from '@phosphor-icons/react'
+import ColorSchemeSwitcher from '../components/ColorSchemeSwitcher'
 
 export default function Settings() {
   const [isMuted, setIsMuted] = useState(false)
@@ -129,7 +130,7 @@ export default function Settings() {
                     onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
                     className="w-full h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
                     style={{
-                      background: `linear-gradient(to right, #ffeaa7 0%, #ffeaa7 ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) 100%)`
+                      background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) 100%)`
                     }}
                   />
                 </div>
@@ -159,28 +160,52 @@ export default function Settings() {
             </div>
           </motion.div>
 
-          {/* Test Sound Button */}
+          {/* Color Scheme Settings */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-6 h-6 text-white text-xl">🎨</div>
+              <h2 className="text-2xl font-bold text-white">Appearance</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-white/90 text-lg">Color Theme</span>
+                <ColorSchemeSwitcher />
+              </div>
+              
+              <p className="text-white/60 text-sm">
+                Choose from 9 different color schemes to match your style
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Test Sound Button */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
             className="text-center"
           >
-                         <button
-               onClick={() => {
-                 if (!isMuted && volume > 0) {
-                   // Play test sound using existing audio files
-                   const testAudio = new Audio('/sounds/correct_answer.mp3')
-                   testAudio.volume = volume / 100
-                   testAudio.play().catch(() => {})
-                 }
-               }}
-               disabled={isMuted || volume === 0}
-                               className="text-gray-800 font-bold py-3 px-8 rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                               style={{ background: 'linear-gradient(45deg, #ffeaa7, #fdcb6e)' }}
-             >
-               Test Sound
-             </button>
+            <button
+              onClick={() => {
+                if (!isMuted && volume > 0) {
+                  // Play test sound using existing audio files
+                  const testAudio = new Audio('/sounds/correct_answer.mp3')
+                  testAudio.volume = volume / 100
+                  testAudio.play().catch(() => {})
+                }
+              }}
+              disabled={isMuted || volume === 0}
+              className="text-[var(--color-text-dark)] font-bold py-3 px-8 rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}
+            >
+              Test Sound
+            </button>
           </motion.div>
         </div>
       </motion.div>

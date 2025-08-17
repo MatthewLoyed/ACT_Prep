@@ -183,9 +183,11 @@ export const ACHIEVEMENTS: Achievement[] = [
 // Achievement management functions
 export function checkAchievements(stats: UserStats): Achievement[] {
   const earnedAchievements: Achievement[] = []
+  const existingAchievements = loadUserAchievements()
+  const existingIds = new Set(existingAchievements.map(a => a.id))
   
   for (const achievement of ACHIEVEMENTS) {
-    if (achievement.condition(stats) && !achievement.earnedAt) {
+    if (achievement.condition(stats) && !existingIds.has(achievement.id)) {
       earnedAchievements.push({
         ...achievement,
         earnedAt: new Date().toISOString()
@@ -216,8 +218,37 @@ export function saveUserAchievements(achievements: Achievement[]): void {
 
 export function addNewAchievements(newAchievements: Achievement[]): void {
   const existing = loadUserAchievements()
-  const updated = [...existing, ...newAchievements]
-  saveUserAchievements(updated)
+  const existingIds = new Set(existing.map(a => a.id))
+  
+  // Only add achievements that don't already exist
+  const uniqueNewAchievements = newAchievements.filter(achievement => !existingIds.has(achievement.id))
+  
+  if (uniqueNewAchievements.length > 0) {
+    const updated = [...existing, ...uniqueNewAchievements]
+    saveUserAchievements(updated)
+  }
+}
+
+export function cleanDuplicateAchievements(): void {
+  const existing = loadUserAchievements()
+  const seen = new Set<string>()
+  const unique = existing.filter(achievement => {
+    if (seen.has(achievement.id)) {
+      return false
+    }
+    seen.add(achievement.id)
+    return true
+  })
+  
+  if (unique.length !== existing.length) {
+    saveUserAchievements(unique)
+    console.log(`🧹 Cleaned up ${existing.length - unique.length} duplicate achievements`)
+  }
+}
+
+export function clearAllAchievements(): void {
+  saveUserAchievements([])
+  console.log('🗑️ Cleared all achievements')
 }
 
 export function getAchievementProgress(_stats: UserStats): {

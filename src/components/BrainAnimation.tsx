@@ -36,7 +36,7 @@ export default function BrainAnimation({ isThinking, size = 'md' }: BrainAnimati
         } : {
           duration: 0.3
         }}
-        className={`${sizeClasses[size]} bg-gradient-to-br from-[#ffeaa7] to-[#fdcb6e] rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
+        className={`${sizeClasses[size]} bg-gradient-to-br from-[#facc15] to-[#eab308] rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}
       >
                  <Brain className={`${iconSizes[size]} text-white`} weight="fill" />
         

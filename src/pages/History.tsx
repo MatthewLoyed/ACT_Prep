@@ -6,7 +6,8 @@ import {
   getAchievementProgress, 
   type UserStats, 
   addNewAchievements,
-  checkAchievements
+  checkAchievements,
+  cleanDuplicateAchievements
 } from '../lib/achievements'
 
 type SectionKey = 'english' | 'math' | 'reading' | 'science'
@@ -34,19 +35,9 @@ export default function History() {
 
   useEffect(() => {
     loadData()
+    // Clean up any duplicate achievements on load
+    cleanDuplicateAchievements()
   }, [])
-
-  // Check for new achievements when data loads
-  useEffect(() => {
-    if (!loading) {
-      const stats = calculateUserStats()
-      const newAchievements = checkAchievements(stats)
-      if (newAchievements.length > 0) {
-        addNewAchievements(newAchievements)
-        console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
-      }
-    }
-  }, [loading, sessions, tests])
 
   const loadData = async () => {
     try {
@@ -111,8 +102,8 @@ export default function History() {
     return sum + Object.values(test.sections).reduce((sectionSum: number, section: any) => sectionSum + (section?.length || 0), 0)
   }, 0)
 
-  // Calculate user stats for achievements
-  const calculateUserStats = (): UserStats => {
+  // Calculate user stats for achievements (memoized)
+  const userStats = useMemo((): UserStats => {
     const sectionCounts = {
       english: sessions.filter(s => s.section === 'english').reduce((sum, s) => sum + s.total, 0),
       math: sessions.filter(s => s.section === 'math').reduce((sum, s) => sum + s.total, 0),
@@ -141,7 +132,22 @@ export default function History() {
       perfectScores,
       studyStreak: consecutiveDays // Simplified for now
     }
-  }
+  }, [sessions, tests, overallTotal, overallTime])
+
+  // Check for new achievements when data loads
+  useEffect(() => {
+    if (!loading) {
+      const newAchievements = checkAchievements(userStats)
+      if (newAchievements.length > 0) {
+        addNewAchievements(newAchievements)
+        console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
+      }
+      
+      // Debug: Log current achievements
+      const progress = getAchievementProgress(userStats)
+      console.log('📊 Current achievements:', progress.earned.map(a => ({ id: a.id, title: a.title, earnedAt: a.earnedAt })))
+    }
+  }, [loading, userStats]) // Run when loading changes or userStats changes
 
   return (
     <motion.div 
@@ -180,10 +186,9 @@ export default function History() {
                   <p className="text-secondary">Celebrate your progress and milestones!</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-[#ffeaa7]">
+                  <div className="text-2xl font-bold text-[var(--color-accent)]">
                     {(() => {
-                      const stats = calculateUserStats()
-                      const progress = getAchievementProgress(stats)
+                      const progress = getAchievementProgress(userStats)
                       return `${progress.earnedCount}/${progress.total}`
                     })()}
                   </div>
@@ -193,16 +198,15 @@ export default function History() {
               
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {(() => {
-                  const stats = calculateUserStats()
-                  const progress = getAchievementProgress(stats)
+                  const progress = getAchievementProgress(userStats)
                   
                   return progress.earned.map((achievement, index) => (
                     <motion.div
-                      key={achievement.id}
+                      key={`${achievement.id}-${achievement.earnedAt || index}`}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: index * 0.1 }}
-                      className="bg-gradient-to-br from-[#ffeaa7]/20 to-[#fdcb6e]/20 border border-[#ffeaa7]/30 rounded-xl p-4 hover:scale-105 transition-transform"
+                      className="bg-gradient-to-br from-[var(--color-accent)]/20 to-[var(--color-accent-dark)]/20 border border-[var(--color-accent)]/30 rounded-xl p-4 hover:scale-105 transition-transform"
                     >
                       <div className="flex items-center gap-3">
                         <div className="text-3xl">{achievement.icon}</div>
@@ -210,7 +214,7 @@ export default function History() {
                           <h4 className="font-semibold text-white">{achievement.title}</h4>
                           <p className="text-sm text-secondary">{achievement.description}</p>
                           {achievement.earnedAt && (
-                            <p className="text-xs text-[#ffeaa7] mt-1">
+                            <p className="text-xs text-[var(--color-accent)] mt-1">
                               Earned {new Date(achievement.earnedAt).toLocaleDateString()}
                             </p>
                           )}
@@ -222,8 +226,7 @@ export default function History() {
               </div>
               
               {(() => {
-                const stats = calculateUserStats()
-                const progress = getAchievementProgress(stats)
+                const progress = getAchievementProgress(userStats)
                 return progress.earned.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="text-4xl mb-2">🏆</div>
