@@ -20,6 +20,7 @@ type Test = {
   pdfData?: string
   progress?: any
   answers?: Record<string, number>
+  hasProgress?: boolean
 }
 
 export default function Practice() {
