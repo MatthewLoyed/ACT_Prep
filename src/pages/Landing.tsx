@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import BlurText from '../components/BlurText'
 import TextType from '../components/TextType'
+import FunWordAnimation from '../components/FunWordAnimation'
 
 
 const features = [
@@ -70,14 +71,10 @@ export default function Landing() {
       {/* Hero */}
       <div className="container grid place-items-center relative z-10">
         <div className="max-w-4xl text-center backdrop-blur-md">
-          <BlurText
-            text="ACT® Prep that feels fun"
-            className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl mb-6"
-            delay={100}
-            animateBy="words"
-            direction="top"
-            stepDuration={0.4}
-          />
+          <div className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl mb-6">
+            ACT® Prep that is{' '}
+            <FunWordAnimation className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl" />
+          </div>
           <TextType
             text={[
               "Skip the stale PDFs. Practice with lively feedback and smooth animations.",
@@ -98,8 +95,25 @@ export default function Landing() {
             animate={{ opacity: 1, y: 0 }} 
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            <Link to="/import" className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-              Import A Test & Start Practicing!
+            <Link to="/import">
+              <motion.div
+                className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                animate={{
+                  boxShadow: [
+                    '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
+                    '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
+                    '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
+                  ],
+                  scale: [1, 1.05, 1]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                Click Here To Get Started!
+              </motion.div>
             </Link>
             <a href="#features" className="btn btn-ghost text-lg px-6 py-3 hover:bg-slate-100 dark:hover:bg-slate-800">
               See features

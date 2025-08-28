@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { listTestsFromLocalStorage } from '../lib/localTestStore'
+import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
 import ProgressCircle from '../components/ProgressCircle'
 import { 
   getAchievementProgress, 
@@ -9,6 +9,7 @@ import {
   checkAchievements,
   cleanDuplicateAchievements
 } from '../lib/achievements'
+import { supabase } from '../lib/supabase'
 
 type SectionKey = 'english' | 'math' | 'reading' | 'science'
 
@@ -28,26 +29,67 @@ type Test = {
 }
 
 export default function History() {
-  const [goal, setGoal] = useState<number>(() => Number(localStorage.getItem('goal36') ?? 28))
+  const [goal, setGoal] = useState<number>(28)
   const [sessions, setSessions] = useState<Session[]>([])
   const [tests, setTests] = useState<Test[]>([])
   const [loading, setLoading] = useState(true)
+  const [achievementProgress, setAchievementProgress] = useState<{
+    earned: any[]
+    available: any[]
+    total: number
+    earnedCount: number
+  }>({ earned: [], available: [], total: 0, earnedCount: 0 })
 
   useEffect(() => {
     loadData()
     // Clean up any duplicate achievements on load
-    cleanDuplicateAchievements()
+    cleanDuplicateAchievements().catch(console.error)
   }, [])
 
   const loadData = async () => {
     try {
-      // Load sessions from localStorage (legacy data)
-      const stored = JSON.parse(localStorage.getItem('sessions') ?? '[]') as Session[]
-      setSessions(stored)
+      // Load goal from Supabase - get the most recent row
+      const { data: goalData, error: goalError } = await supabase
+        .from('user_preferences')
+        .select('goal_score')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
       
-      // Load tests from localStorage
-      const localTests = await listTestsFromLocalStorage()
-      setTests(localTests)
+      if (goalError) {
+        console.error('Error loading goal:', goalError)
+      } else if (goalData?.goal_score) {
+        setGoal(goalData.goal_score)
+      }
+      
+      // Load sessions from Supabase
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('sessions')
+        .select('*')
+        .order('date', { ascending: false })
+      
+      if (sessionsError) {
+        console.error('Error loading sessions:', sessionsError)
+        setSessions([])
+      } else if (sessionsData) {
+        setSessions(sessionsData as Session[])
+      } else {
+        setSessions([])
+      }
+      
+      // Load tests from Supabase
+      const supabaseTests = await listTestsFromSupabase()
+      if (supabaseTests && Array.isArray(supabaseTests)) {
+        setTests(supabaseTests.map(test => ({
+          id: test.id,
+          name: test.name,
+          createdAt: test.createdAt,
+          sections: {} // Tests from Supabase don't include full content
+        })))
+      } else {
+        setTests([])
+      }
+      
     } catch (error) {
       console.error('Error loading history data:', error)
     } finally {
@@ -55,9 +97,25 @@ export default function History() {
     }
   }
 
-  useEffect(() => {
-    localStorage.setItem('goal36', String(goal))
-  }, [goal])
+
+
+  const updateGoal = async (newGoal: number) => {
+    try {
+      setGoal(newGoal)
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert({ 
+          goal_score: newGoal,
+          created_at: new Date().toISOString()
+        })
+      
+      if (error) {
+        console.error('Error updating goal:', error)
+      }
+    } catch (error) {
+      console.error('Error updating goal:', error)
+    }
+  }
 
   const totals = useMemo(() => {
     const by: Record<SectionKey, { raw: number; total: number; time: number; count: number }> = {
@@ -99,6 +157,7 @@ export default function History() {
   
   // Calculate total questions from imported tests
   const totalImportedQuestions = tests.reduce((sum, test) => {
+    if (!test.sections) return sum
     return sum + Object.values(test.sections).reduce((sectionSum: number, section: any) => sectionSum + (section?.length || 0), 0)
   }, 0)
 
@@ -134,19 +193,42 @@ export default function History() {
     }
   }, [sessions, tests, overallTotal, overallTime])
 
+  // Load achievement progress when userStats changes
+  useEffect(() => {
+    const loadAchievements = async () => {
+      try {
+        const progress = await getAchievementProgress(userStats)
+        setAchievementProgress(progress)
+      } catch (error) {
+        console.error('Error loading achievements:', error)
+      }
+    }
+    
+    if (!loading) {
+      loadAchievements()
+    }
+  }, [userStats, loading])
+
   // Check for new achievements when data loads
   useEffect(() => {
-    if (!loading) {
-      const newAchievements = checkAchievements(userStats)
-      if (newAchievements.length > 0) {
-        addNewAchievements(newAchievements)
-        console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
+    const checkForNewAchievements = async () => {
+      if (!loading) {
+        try {
+          const newAchievements = await checkAchievements(userStats)
+          if (newAchievements.length > 0) {
+            await addNewAchievements(newAchievements)
+            console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
+          }
+          
+          // Debug: Log current achievements
+          console.log('📊 Current achievements:', achievementProgress.earned.map(a => ({ id: a.id, title: a.title, earnedAt: a.earnedAt })))
+        } catch (error) {
+          console.error('Error checking achievements:', error)
+        }
       }
-      
-      // Debug: Log current achievements
-      const progress = getAchievementProgress(userStats)
-      console.log('📊 Current achievements:', progress.earned.map(a => ({ id: a.id, title: a.title, earnedAt: a.earnedAt })))
     }
+    
+    checkForNewAchievements()
   }, [loading, userStats]) // Run when loading changes or userStats changes
 
   return (
@@ -187,20 +269,14 @@ export default function History() {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-[var(--color-accent)]">
-                    {(() => {
-                      const progress = getAchievementProgress(userStats)
-                      return `${progress.earnedCount}/${progress.total}`
-                    })()}
+                    {`${achievementProgress.earnedCount}/${achievementProgress.total}`}
                   </div>
                   <div className="text-sm text-secondary">Badges Earned</div>
                 </div>
               </div>
               
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {(() => {
-                  const progress = getAchievementProgress(userStats)
-                  
-                  return progress.earned.map((achievement, index) => (
+                {achievementProgress.earned.map((achievement, index) => (
                     <motion.div
                       key={`${achievement.id}-${achievement.earnedAt || index}`}
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -221,19 +297,15 @@ export default function History() {
                         </div>
                       </div>
                     </motion.div>
-                  ))
-                })()}
+                  ))}
               </div>
               
-              {(() => {
-                const progress = getAchievementProgress(userStats)
-                return progress.earned.length === 0 ? (
+              {achievementProgress.earned.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="text-4xl mb-2">🏆</div>
                     <p className="text-secondary">Complete your first question to earn your first achievement!</p>
                   </div>
-                ) : null
-              })()}
+                ) : null}
             </div>
             
             {/* Progress Circles */}
@@ -290,7 +362,7 @@ export default function History() {
             <p className="text-secondary">Aim high and track your momentum.</p>
           </div>
           <div className="flex items-center gap-2">
-            <input type="number" min={1} max={36} value={goal} onChange={e => setGoal(Number(e.target.value))} className="w-20 rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900" />
+                            <input type="number" min={1} max={36} value={goal} onChange={e => updateGoal(Number(e.target.value))} className="w-20 rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900" />
             <span className="text-sm">/ 36</span>
           </div>
         </div>

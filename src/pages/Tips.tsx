@@ -10,6 +10,7 @@ import {
   PencilSimple,
   PushPin
 } from '@phosphor-icons/react'
+import { supabase } from '../lib/supabase'
 
 type UserTip = {
   id: string
@@ -25,49 +26,68 @@ export default function Tips() {
   const [editingTipId, setEditingTipId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
 
-  // Load user tips from localStorage on component mount
+  // Load user tips from Supabase on component mount
   useEffect(() => {
-    // Check if localStorage is available
-    if (typeof window === 'undefined' || !window.localStorage) {
-      setTipsLoaded(true) // Mark as loaded even if failed
-      return
-    }
-    
-    try {
-      const savedTips = localStorage.getItem('userTips')
-      
-      if (savedTips) {
-        const parsedTips = JSON.parse(savedTips)
-        setUserTips(parsedTips)
+    const loadTips = async () => {
+      try {
+        const { data } = await supabase
+          .from('user_tips')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (data) {
+          setUserTips(data.map(tip => ({
+            id: tip.id,
+            text: tip.text,
+            createdAt: tip.created_at,
+            isPinned: tip.is_pinned || false
+          })))
+        }
+      } catch (error) {
+        console.error('❌ Error loading tips from Supabase:', error)
       }
-    } catch (error) {
-      console.error('❌ Error accessing localStorage:', error)
+      
+      setTipsLoaded(true)
     }
     
-    // Mark tips as loaded (whether we found any or not)
-    setTipsLoaded(true)
+    loadTips()
   }, [])
 
-  // Track if tips have been loaded from localStorage
+  // Track if tips have been loaded from Supabase
   const [tipsLoaded, setTipsLoaded] = useState(false)
 
-  // Save user tips to localStorage when they change
+  // Save user tips to Supabase when they change
   useEffect(() => {
-    // Don't save until tips have been loaded from localStorage
+    // Don't save until tips have been loaded from Supabase
     if (!tipsLoaded) {
       return
     }
     
-    // Check if localStorage is available
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return
+    const saveTips = async () => {
+      try {
+        // For simplicity, we'll replace all tips each time
+        // In a production app, you'd want to track individual changes
+        await supabase
+          .from('user_tips')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+        
+        if (userTips.length > 0) {
+          await supabase
+            .from('user_tips')
+            .insert(userTips.map(tip => ({
+              id: tip.id,
+              text: tip.text,
+              created_at: tip.createdAt,
+              is_pinned: tip.isPinned || false
+            })))
+        }
+      } catch (error) {
+        console.error('❌ Error saving tips to Supabase:', error)
+      }
     }
     
-    try {
-      localStorage.setItem('userTips', JSON.stringify(userTips))
-    } catch (error) {
-      console.error('❌ Error saving tips to localStorage:', error)
-    }
+    saveTips()
   }, [userTips, tipsLoaded])
 
   const addTip = () => {

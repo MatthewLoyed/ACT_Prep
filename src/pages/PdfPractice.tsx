@@ -2,10 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 // Use CDN worker to avoid version mismatch issues
-import { loadTestFromLocalStorage } from '../lib/localTestStore'
+import { loadTestFromSupabase, updateTestAnswers } from '../lib/simpleSupabaseStorage'
 import type { TestBundle } from '../lib/testStore'
-import { cleanMathText } from '../lib/actParser'
+
 import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }
+}
 
 // Define types locally
 type SectionId = 'english' | 'math' | 'reading' | 'science'
@@ -31,6 +43,7 @@ type Question = {
   answerIndex?: number
   passage?: string
   passageId?: string
+  questionNumber?: number // Pre-parsed question number
 }
 
 export default function PdfPractice() {
@@ -38,6 +51,8 @@ export default function PdfPractice() {
   const { subject = 'english' } = useParams()
   const [params] = useSearchParams()
   const testId = params.get('testId') || ''
+  const isResume = params.get('resume') === 'true'
+  const resumeQuestionIndex = parseInt(params.get('questionIndex') || '0')
 
   // console.log(`PdfPractice: Current subject = ${subject}, testId = ${testId}`)
 
@@ -63,21 +78,33 @@ export default function PdfPractice() {
       
       try {
         setLoading(true)
-        // PDF debug removed
-        const loadedTest = await loadTestFromLocalStorage(testId)
-        console.log('PDF DEBUG: Test loaded:', loadedTest)
-        console.log('PDF DEBUG: Has PDF data:', !!loadedTest?.pdfData)
+        // Load from Supabase
+        const loadedTest = await loadTestFromSupabase(testId)
+              // Test loaded successfully
         if (loadedTest) {
-          setActive(loadedTest)
+          // Convert to TestBundle format
+          const testBundle: TestBundle = {
+            id: loadedTest.id,
+            name: loadedTest.name,
+            createdAt: loadedTest.createdAt,
+            sections: loadedTest.sections,
+            pdfData: loadedTest.pdfData,
+            sectionPages: loadedTest.sectionPages,
+            pageQuestions: loadedTest.pageQuestions,
+            answers: loadedTest.answers // Add the answers field for resume functionality
+          }
+          setActive(testBundle)
           
           // Determine test type and get configuration
-          const config = getTestTypeConfig(loadedTest)
+          const config = getTestTypeConfig(testBundle)
+          console.log('🎯 DEBUG: Test config loaded:', config)
+          console.log('🎯 DEBUG: Subject config for', subject, ':', config?.subjects[subject as keyof typeof config.subjects])
           setTestConfig(config)
         } else {
           setActive(null)
         }
       } catch (error) {
-        console.error('PDF DEBUG: Failed to load test:', error)
+        console.error('Failed to load test:', error)
         setActive(null)
       } finally {
         setLoading(false)
@@ -86,6 +113,8 @@ export default function PdfPractice() {
     
     loadTest()
   }, [testId])
+
+
   const allQuestions: Question[] = useMemo(() => {
     const fallback: Question[] = []
     if (!subject) return fallback
@@ -97,13 +126,7 @@ export default function PdfPractice() {
     
     // Debug: Show what questions the parser provided
     if (questions.length > 0) {
-      const questionsWithAnswers = questions.filter(q => q.answerIndex !== undefined)
-      console.log(`PRACTICE DEBUG: ${subject} section loaded ${questions.length} questions from parser (${questionsWithAnswers.length} with answers)`)
-      
-      // Show first few questions with their answers
-      questions.slice(0, 3).forEach((q, i) => {
-        console.log(`PRACTICE DEBUG: Question ${i + 1}: ID=${q.id}, Answer=${q.answerIndex}, Choices=${q.choices.length}, Prompt="${q.prompt.substring(0, 50)}..."`)
-      })
+      // Questions loaded successfully
     }
     
     return questions
@@ -113,6 +136,7 @@ export default function PdfPractice() {
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [correctAudio] = useState(() => new Audio('/sounds/correct_answer.mp3'))
   const [wrongAudio] = useState(() => new Audio('/sounds/wrong_answer.wav'))
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<{ ok: boolean; id: string } | null>(null)
   const [streak, setStreak] = useState<number>(0)
   const [showStreakMessage, setShowStreakMessage] = useState<boolean>(false)
@@ -122,7 +146,7 @@ export default function PdfPractice() {
   const [testCompleted, setTestCompleted] = useState<boolean>(false)
   const [showCompletionCelebration, setShowCompletionCelebration] = useState<boolean>(false)
   const [lastManualAdvance, setLastManualAdvance] = useState<number | null>(null)
-  const [isPageDetectionRunning, setIsPageDetectionRunning] = useState(false)
+  const [isIntentionalPageChange, setIsIntentionalPageChange] = useState(false)
   
   // Timer functionality
   const [timerEnabled, setTimerEnabled] = useState<boolean>(false)
@@ -151,20 +175,166 @@ export default function PdfPractice() {
     return () => clearInterval(interval)
   }, [timerEnabled, timeRemaining, timerPaused])
 
+
+
   // Reset all state when subject changes to prevent data corruption
   useEffect(() => {
     // console.log(`Subject changed to: ${subject} - Resetting all state`)
 
     setAnswers({})
     setFeedback(null)
-    setQIdx(0)
+    // Don't reset question index if we're resuming
+    if (!isResume) {
+      setQIdx(0)
+    }
     setTestCompleted(false)
     setLastManualAdvance(null)
     setStreak(0) // Reset streak when changing subjects
     setShowStreakMessage(false) // Hide any existing streak message
     // Reset page number to 1, will be updated by the section detection useEffect
     setPageNum(1)
-  }, [subject])
+  }, [subject, isResume])
+
+  // Handle resume functionality
+  useEffect(() => {
+    if (isResume && active && resumeQuestionIndex >= 0) {
+      // Load existing answers from the test data
+      if (active.answers) {
+        setAnswers(active.answers)
+      }
+      
+      // Find the page that contains the resumed question
+      const subjectPageQuestions = active?.pageQuestions?.[subject as SectionId]
+      if (subjectPageQuestions) {
+        // Find which page contains the resumed question
+        const targetQuestionId = `${subject}-${resumeQuestionIndex + 1}` // Convert index to question ID for current subject
+        
+        for (const [pageNumStr, questionIds] of Object.entries(subjectPageQuestions)) {
+          if (questionIds.includes(targetQuestionId)) {
+            const targetPage = parseInt(pageNumStr)
+            // Find the index of the target question within this page's question array
+            const pageQuestionIndex = questionIds.indexOf(targetQuestionId)
+            setPageNum(targetPage)
+            // Set the question index to the position within the page, not the global index
+            setQIdx(pageQuestionIndex)
+            return // Exit early since we found the question
+          }
+        }
+      }
+      
+      // Fallback: Set the question index to resume from (if page mapping failed)
+      setQIdx(resumeQuestionIndex)
+    }
+  }, [isResume, active, resumeQuestionIndex, subject])
+
+  // Debounced save function
+  const debouncedSave = useCallback(
+    debounce(async (answersToSave: Record<string, number>) => {
+      if (testId) {
+        console.log(`🎯 RESUME DEBUG: Auto-saving ${Object.keys(answersToSave).length} answers to Supabase`)
+        setSaveStatus('saving')
+        try {
+          await updateTestAnswers(testId, answersToSave)
+          console.log('🎯 RESUME DEBUG: Successfully auto-saved answers to Supabase')
+          setSaveStatus('saved')
+          setTimeout(() => setSaveStatus('idle'), 2000)
+        } catch (error) {
+          console.warn('🎯 RESUME DEBUG: Could not auto-save answers:', error)
+          setSaveStatus('error')
+          setTimeout(() => setSaveStatus('idle'), 3000)
+        }
+      }
+    }, 2000), // Save after 2 seconds of no new answers
+    [testId]
+  )
+
+  // Answer selection handler with debounced auto-save
+  const onAnswer = useCallback(async (qid: string, idx: number, correctIdx?: number) => {
+    console.log(`🎯 RESUME DEBUG: Answer selected: ${qid} = ${idx}`)
+    
+    const newAnswers = { ...answers, [qid]: idx }
+    setAnswers(newAnswers)
+    
+    console.log(`🎯 RESUME DEBUG: Updated answers object has ${Object.keys(newAnswers).length} answers`)
+    
+    // Trigger debounced save
+    debouncedSave(newAnswers)
+    
+    const ok = typeof correctIdx === 'number' ? idx === correctIdx : false
+    setFeedback({ ok, id: qid })
+    
+    // Play sound effects using existing audio files
+    if (ok) {
+      try { correctAudio.currentTime = 0 } catch { /* ignore */ }
+      correctAudio.play().catch(() => {})
+    } else {
+      try { wrongAudio.currentTime = 0 } catch { /* ignore */ }
+      wrongAudio.play().catch(() => {})
+    }
+    
+    // Handle streak logic and celebrations
+    if (ok) {
+      setStreak(prev => {
+        const newStreak = prev + 1
+        // Show celebrations for milestones
+        if (newStreak >= 3 && (newStreak % 3 === 0 || newStreak === 5 || newStreak === 10)) {
+          setShowStreakMessage(true)
+          setShowStudyBuddy(true)
+          setShowSuccessCelebration(true)
+          // Play level up sound for streak milestones
+          const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
+          levelUpAudio.play().catch(() => {})
+          setTimeout(() => {
+            setShowStreakMessage(false)
+            setShowStudyBuddy(false)
+            setShowSuccessCelebration(false)
+          }, 3000)
+        } else if (newStreak === 1) {
+          // Show success celebration for first correct answer
+          setShowSuccessCelebration(true)
+          setTimeout(() => setShowSuccessCelebration(false), 2000)
+        } else if (newStreak >= 2) {
+          // Show mascot for any streak of 2 or more
+          setShowStudyBuddy(true)
+          setTimeout(() => setShowStudyBuddy(false), 2000)
+        }
+        return newStreak
+      })
+    } else {
+      setStreak(0) // Reset streak on wrong answer
+    }
+  }, [answers, testId, correctAudio, wrongAudio])
+
+
+
+  // Add save confirmation when leaving the page - defined after answers state
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (Object.keys(answers).length > 0) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved progress. Are you sure you want to leave?'
+        return e.returnValue
+      }
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (Object.keys(answers).length > 0) {
+        const confirmed = confirm('You have unsaved progress. Are you sure you want to leave? Your answers will be saved automatically.')
+        if (!confirmed) {
+          e.preventDefault()
+          window.history.pushState(null, '', window.location.href)
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [answers])
 
   // Load PDF from stored data
   useEffect(() => {
@@ -177,7 +347,7 @@ export default function PdfPractice() {
           // PDF loading debug info removed to focus on page detection
     
     if (!active.pdfData) {
-      console.log('PDF DEBUG: No PDF data found in test')
+      console.log('No PDF data found in test')
       setPdf(null)
       setPdfLoading(false)
       return
@@ -211,17 +381,17 @@ export default function PdfPractice() {
       
       getDocument({ data: bytes.buffer }).promise.then(doc => { 
         if (!cancelled) {
-          console.log('PDF DEBUG: PDF loaded successfully, pages:', doc.numPages)
+          console.log('PDF loaded successfully, pages:', doc.numPages)
           setPdf(doc) 
           setPdfLoading(false) // PDF loading is complete
         }
       }).catch(err => {
-        console.error('PDF DEBUG: Error loading PDF:', err)
+        console.error('Error loading PDF:', err)
         setPdf(null)
         setPdfLoading(false)
       })
     } catch (err) {
-      console.error('PDF DEBUG: Error converting PDF data:', err)
+              console.error('Error converting PDF data:', err)
       setPdf(null)
       setPdfLoading(false)
     }
@@ -232,43 +402,34 @@ export default function PdfPractice() {
     }
   }, [testId, active])
 
-  // Jump to first real question page on load
+    // Jump to first real question page on load
   useEffect(() => {
     if (!pdf || !active) return
     let mounted = true
-    setIsPageDetectionRunning(true)
     
     ;(async () => {
       // Check if we already have stored page numbers for this test
       if (active.sectionPages && active.sectionPages[subject as SectionId]) {
         const storedPage = active.sectionPages[subject as SectionId]
         if (storedPage) {
-          console.log(`PDF DEBUG: Using stored page ${storedPage} for ${subject} section`)
+          console.log(`Using stored page ${storedPage} for ${subject} section`)
           if (mounted) {
-            setPageNum(storedPage)
-            setLastManualAdvance(storedPage)
-            setIsPageDetectionRunning(false)
+            // Don't override page if we're resuming - the resume logic will set the correct page
+            if (!isResume) {
+              setPageNum(storedPage)
+              setLastManualAdvance(storedPage)
+            }
           }
           return
         }
       }
       
       // If no stored pages, this is an error - section pages should be detected during import
-      console.error(`PDF DEBUG: No stored page for ${subject} - section pages should be detected during import`)
-      if (mounted) {
-        setIsPageDetectionRunning(false)
-      }
-      return
-      
-      // Mark detection as complete
-      if (mounted) {
-        setIsPageDetectionRunning(false)
-      }
+      console.error(`No stored page for ${subject} - section pages should be detected during import`)
     })()
     
     return () => { 
       mounted = false 
-      setIsPageDetectionRunning(false)
     }
   }, [pdf, subject, active])
 
@@ -283,21 +444,15 @@ export default function PdfPractice() {
     
     ;(async () => {
       const page = await pdf.getPage(pageNum)
-      const content = await page.getTextContent()
-      type PDFTextItem = { str: string }
-      const text = (content.items as PDFTextItem[]).map((it) => it.str).join('\n')
       
       if (!mounted) return
       
-      // Check for test ending - allow completion of questions on the final page
-      const hasEndOfTest = 
-        (subject === 'english' && /END OF TEST 1/i.test(text)) ||
-        (subject === 'math' && /END OF TEST 2/i.test(text)) ||
-        (subject === 'reading' && /END OF TEST 3/i.test(text))
+      // Check for test ending using pre-parsed data instead of hardcoded regex
+      const hasEndOfTest = testConfig && currentNum === testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions
       
-      // Debug: log when we see "END OF TEST" 
+      // Debug: log when we reach the final question
       if (hasEndOfTest) {
-        // console.log(`Page ${pageNum}: Found "END OF TEST"`)
+        console.log(`Page ${pageNum}: Reached final question (${currentNum}) for ${subject} section`)
       }
 
       // Clear manual advance flag after a delay
@@ -378,12 +533,40 @@ export default function PdfPractice() {
     return allQuestions
   }, [allQuestions, active?.pageQuestions, subject, pageNum])
 
-  // Reset question index when page changes
-  useEffect(() => { setQIdx(0) }, [pageNum])
+  // Compute subject-specific progress (only count answers for current subject)
+  const subjectAnswers = useMemo(() => {
+    if (!subject || !allQuestions.length) return {}
+    
+    // Filter answers to only include questions from the current subject
+    const subjectQuestionIds = allQuestions.map(q => q.id)
+    const filteredAnswers: Record<string, number> = {}
+    
+    Object.entries(answers).forEach(([questionId, answer]) => {
+      if (subjectQuestionIds.includes(questionId)) {
+        filteredAnswers[questionId] = answer
+      }
+    })
+    
+    return filteredAnswers
+  }, [answers, subject, allQuestions])
+
+  // Reset question index when page changes (but not when resuming or intentional page change)
+  useEffect(() => { 
+    if (!isResume && !isIntentionalPageChange) {
+      setQIdx(0) 
+    }
+    // Reset the flag after handling
+    if (isIntentionalPageChange) {
+      setIsIntentionalPageChange(false)
+    }
+  }, [pageNum, isResume, isIntentionalPageChange])
 
   // Clear previous test data when switching sections
   useEffect(() => {
-    setAnswers({})
+    // Don't clear answers if we're resuming - they'll be loaded by the resume logic
+    if (!isResume) {
+      setAnswers({})
+    }
     setFeedback(null)
     setQIdx(0)
     setTestCompleted(false)
@@ -391,67 +574,20 @@ export default function PdfPractice() {
     setStreak(0) // Reset streak when switching sections
     setShowStreakMessage(false) // Hide any existing streak message
     console.log(`Switched to ${subject} section - cleared previous test data`)
-  }, [subject])
+  }, [subject, isResume])
 
 
 
-  const onAnswer = useCallback((qid: string, idx: number, correctIdx?: number) => {
-    setAnswers(prev => ({ ...prev, [qid]: idx }))
-    const ok = typeof correctIdx === 'number' ? idx === correctIdx : false
-    setFeedback({ ok, id: qid })
-    
-    // Play sound effects using existing audio files
-    if (ok) {
-      try { correctAudio.currentTime = 0 } catch { /* ignore */ }
-      correctAudio.play().catch(() => {})
-    } else {
-      try { wrongAudio.currentTime = 0 } catch { /* ignore */ }
-      wrongAudio.play().catch(() => {})
-    }
-    
-    // Handle streak logic and celebrations
-    if (ok) {
-      setStreak(prev => {
-        const newStreak = prev + 1
-        // Show celebrations for milestones
-        if (newStreak >= 3 && (newStreak % 3 === 0 || newStreak === 5 || newStreak === 10)) {
-          setShowStreakMessage(true)
-          setShowStudyBuddy(true)
-          setShowSuccessCelebration(true)
-          // Play level up sound for streak milestones
-          const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
-          levelUpAudio.play().catch(() => {})
-          setTimeout(() => {
-            setShowStreakMessage(false)
-            setShowStudyBuddy(false)
-            setShowSuccessCelebration(false)
-          }, 3000)
-        } else if (newStreak === 1) {
-          // Show success celebration for first correct answer
-          setShowSuccessCelebration(true)
-          setTimeout(() => setShowSuccessCelebration(false), 2000)
-        } else if (newStreak >= 2) {
-          // Show mascot for any streak of 2 or more
-          setShowStudyBuddy(true)
-          setTimeout(() => setShowStudyBuddy(false), 2000)
-        }
-        return newStreak
-      })
-    } else {
-      setStreak(0) // Reset streak on wrong answer
-    }
-    
-    try { (ok ? correctAudio : wrongAudio).currentTime = 0 } catch { /* ignore */ }
-    ;(ok ? correctAudio : wrongAudio).play().catch(() => {})
-    // Keep feedback visible longer so colors stay - only clear when moving to next question
-    // setTimeout(() => setFeedback(f => (f?.id === qid ? null : f)), 800)
-  }, [correctAudio, wrongAudio])
+
 
   const current = pageQuestions[qIdx]
   const currentNum = useMemo(() => {
     if (!current) return null
-    const m = current.id.match(/(\d+)/)
-    return m ? Number(m[1]) : null
+    // Use pre-parsed question number if available, otherwise extract from ID
+    return current.questionNumber || (() => {
+      const m = current.id.match(/(\d+)/)
+      return m ? Number(m[1]) : null
+    })()
   }, [current])
   
   // Debug current question
@@ -492,33 +628,66 @@ export default function PdfPractice() {
             <p className="text-emerald-100 mt-1">
               {testConfig ? 
                 `${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.time} — ${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions} Questions` :
-                (subject === 'english' && '35 Minutes — 50 Questions') ||
-                (subject === 'math' && '50 Minutes — 45 Questions') ||
-                (subject === 'reading' && '40 Minutes — 36 Questions') ||
-                (subject === 'science' && '40 Minutes — 40 Questions')
+                'Loading test configuration...'
               }
+              {/* Debug info */}
+              {testConfig && (
+                <span className="text-xs opacity-50 ml-2">
+                  (Config: {testConfig.id})
+                </span>
+              )}
             </p>
           </div>
-          <div className="w-24"></div> {/* Spacer to center the title */}
+          <div className="flex items-center gap-2">
+            {/* Auto-save status indicator */}
+            <div className="text-sm text-white/80">
+              {saveStatus === 'saving' && '⏳ Auto-saving...'}
+              {saveStatus === 'saved' && '✅ Auto-saved!'}
+              {saveStatus === 'error' && '❌ Save failed'}
+              {saveStatus === 'idle' && '💾 Auto-save enabled'}
+            </div>
+            
+            {/* Manual save button */}
+            <button
+              className="btn btn-sm btn-outline text-white border-white/30 hover:bg-white/20"
+              onClick={async () => {
+                if (testId && Object.keys(answers).length > 0) {
+                  setSaveStatus('saving')
+                  try {
+                    await updateTestAnswers(testId, answers)
+                    setSaveStatus('saved')
+                    setTimeout(() => setSaveStatus('idle'), 2000)
+                  } catch (error) {
+                    console.error('Failed to save progress:', error)
+                    setSaveStatus('error')
+                    setTimeout(() => setSaveStatus('idle'), 3000)
+                  }
+                }
+              }}
+              disabled={saveStatus === 'saving'}
+            >
+              💾 Save Now
+            </button>
+          </div>
         </div>
         
         {/* Enhanced Progress Bar */}
         <div className="bg-white/20 h-3 rounded-full overflow-hidden relative">
           <div 
             className="h-full bg-gradient-to-r from-accent to-accent-secondary transition-all duration-700 ease-out relative"
-            style={{ width: `${Math.min(100, (Object.keys(answers).length / allQuestions.length) * 100)}%` }}
+            style={{ width: `${Math.min(100, (Object.keys(subjectAnswers).length / allQuestions.length) * 100)}%` }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
             <div className="absolute right-0 top-0 w-2 h-full bg-white/50 rounded-full shadow-lg"></div>
           </div>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-xs font-bold text-white drop-shadow-lg">
-              {Object.keys(answers).length} / {allQuestions.length}
+              {Object.keys(subjectAnswers).length} / {allQuestions.length}
             </span>
           </div>
         </div>
         <div className="text-center mt-2 text-sm text-emerald-100 font-semibold">
-          {Object.keys(answers).length === allQuestions.length ? '🎉 All questions completed!' : 'Keep going!'}
+          <span>{Object.keys(subjectAnswers).length === allQuestions.length ? '🎉 All questions completed!' : 'Keep going!'}</span>
         </div>
         
         {/* Timer UI */}
@@ -608,17 +777,6 @@ export default function PdfPractice() {
               </button>
             </div>
           </div>
-        ) : isPageDetectionRunning ? (
-          <div className="col-span-2 card p-8 text-center">
-            <EngagingLoader 
-              message="Finding the right page for your test..." 
-              size="lg"
-              showThinking={true}
-            />
-            <p className="text-secondary mt-4">
-              We're scanning through the PDF to find the {subject} section for you.
-            </p>
-          </div>
         ) : (
           <>
             <div ref={leftPaneRef} className="card p-2 overflow-auto">
@@ -632,12 +790,16 @@ export default function PdfPractice() {
         </div>
         <canvas ref={canvasRef} className="mx-auto w-full" style={{ maxWidth: '100%', height: 'auto' }} />
         <div className="flex items-center justify-between mt-2 px-2 pb-2">
-          <button className="btn btn-ghost" onClick={() => setPageNum(p => Math.max(1, p - 1))}>Prev</button>
+          <button className="btn btn-ghost" onClick={() => {
+            setIsIntentionalPageChange(true)
+            setPageNum(p => Math.max(1, p - 1))
+          }}>Prev</button>
           <button className="btn btn-primary" onClick={() => {
             if (pdf && pageNum < pdf.numPages) {
               const nextPage = Math.min(pdf.numPages, pageNum + 1)
               console.log(`READING DEBUG: Left pane navigation from page ${pageNum} to page ${nextPage}`)
               setLastManualAdvance(nextPage)
+              setIsIntentionalPageChange(true)
               setPageNum(nextPage)
             }
           }} disabled={!pdf || pageNum >= pdf.numPages}>
@@ -697,7 +859,10 @@ export default function PdfPractice() {
                   <div className="flex justify-center gap-2">
                     <button 
                       className="btn btn-ghost" 
-                      onClick={() => setPageNum(p => Math.max(1, p - 1))}
+                      onClick={() => {
+                        setIsIntentionalPageChange(true)
+                        setPageNum(p => Math.max(1, p - 1))
+                      }}
                       disabled={pageNum === 1}
                     >
                       Previous Page
@@ -708,6 +873,7 @@ export default function PdfPractice() {
                         if (pdf && pageNum < pdf.numPages) {
                           const nextPage = Math.min(pdf.numPages, pageNum + 1)
                           setLastManualAdvance(nextPage)
+                          setIsIntentionalPageChange(true)
                           setPageNum(nextPage)
                         }
                       }}
@@ -738,7 +904,7 @@ export default function PdfPractice() {
                   )}
                 </div>
                 <div className="font-medium mb-4 mt-1">
-                  {cleanMathText(current.prompt)}
+                                          {current.prompt}
                 </div>
                 <div className="space-y-3">
                   {current.choices.map((_, i) => {
@@ -763,28 +929,13 @@ export default function PdfPractice() {
                     
                     const disabled = userAnswered
                     
-                    // Use stored choice letters if available, otherwise fall back to A-D or F-J detection
-                    let choiceLetter = current.choiceLetters?.[i] || 'A'
-                    if (!current.choiceLetters || !current.choiceLetters[i]) {
-                      // Fallback logic: check if first choice starts with F, G, H, J
-                      if (current.choices.length > 0) {
-                        const firstChoice = current.choices[0].trim()
-                        // Enhanced pattern detection: supports both A-D and F-J patterns
-                        if (firstChoice.match(/^[FGHJ][.)]/)) {
-                          choiceLetter = String.fromCharCode(70 + i) // F-J
-                        } else if (firstChoice.match(/^[ABCD][.)]/)) {
-                          choiceLetter = String.fromCharCode(65 + i) // A-D
-                        } else {
-                          // Default fallback
-                          choiceLetter = String.fromCharCode(65 + i) // A-D
-                        }
-                      }
-                    }
+                    // Use stored choice letters from parsed data
+                    const choiceLetter = current.choiceLetters?.[i] || String.fromCharCode(65 + i)
                     
                     return (
                       <button key={i} className={`choice ${state}`} onClick={() => onAnswer(current.id, i, current.answerIndex)} disabled={disabled}>
                         <span className="font-medium mr-2">{choiceLetter.replace(/\.$/, '')}.</span>
-                        {cleanMathText(current.choices[i] || '')}
+                        {current.choices[i] || ''}
                         {userAnswered && thisIsCorrect && !userSelectedThis && (
                           <span className="ml-2 text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 px-2 py-1 rounded">
                             Correct Answer
@@ -848,7 +999,41 @@ export default function PdfPractice() {
                 </AnimatePresence>
 
                 <div className="mt-4 flex justify-end gap-2">
-                  <button className="btn btn-ghost" onClick={() => setQIdx(i => Math.max(0, i - 1))} disabled={qIdx === 0}>Prev question</button>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => {
+                      // If we're on the first question of the page, go to previous page
+                      if (qIdx === 0 && pdf && pageNum > 1) {
+                        // Find the previous page that has questions for this subject
+                        let prevPage = pageNum - 1
+                        while (prevPage >= 1) {
+                          const subjectPageQuestions = active?.pageQuestions?.[subject as SectionId]
+                          if (subjectPageQuestions?.[prevPage] && 
+                              subjectPageQuestions[prevPage].length > 0) {
+                            break
+                          }
+                          prevPage--
+                        }
+                        
+                        if (prevPage >= 1) {
+                          setLastManualAdvance(prevPage)
+                          setIsIntentionalPageChange(true)
+                          setPageNum(prevPage)
+                          // Set to the last question of the previous page
+                          const prevPageQuestions = active?.pageQuestions?.[subject as SectionId]?.[prevPage] || []
+                          const lastQuestionIndex = prevPageQuestions.length - 1
+                          setQIdx(lastQuestionIndex)
+                        }
+                      } else {
+                        // Go to previous question on same page
+                        const newQIdx = Math.max(0, qIdx - 1)
+                        setQIdx(newQIdx)
+                      }
+                    }} 
+                    disabled={qIdx === 0 && pageNum === 1}
+                  >
+                    {qIdx === 0 ? 'Prev Page' : 'Prev question'}
+                  </button>
                                       <button
                       className="btn btn-primary"
                       onClick={() => {
@@ -857,16 +1042,13 @@ export default function PdfPractice() {
                           // Check if all questions on current page are answered
                           const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
                           
-                          // If not all answered, go to next question on same page
-                          if (!allAnswered && i + 1 < pageQuestions.length) {
+                          // Go to next question on same page if not the last question
+                          if (i + 1 < pageQuestions.length) {
                             return i + 1
                           }
                           
                           // If all answered, check if this is the final question of the test
-                          const isLastQuestion = 
-                            (subject === 'english' && currentNum === 75) ||
-                            (subject === 'math' && currentNum === 60) ||
-                            (subject === 'reading' && currentNum === 40)
+                          const isLastQuestion = testConfig && currentNum === testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions
                           
                           // End test if we've reached the last question
                           if (allAnswered && isLastQuestion) {
@@ -878,8 +1060,8 @@ export default function PdfPractice() {
                             return i
                           }
                           
-                          // Otherwise, advance to next page if all questions are answered AND user is on last question of page
-                          if (allAnswered && i === pageQuestions.length - 1 && pdf && pageNum < pdf.numPages) {
+                          // Advance to next page if user is on last question of page (regardless of whether all questions on this page are answered)
+                          if (i === pageQuestions.length - 1 && pdf && pageNum < pdf.numPages) {
                             // Find the next page that has questions for this subject
                             let nextPage = pageNum + 1
                             while (nextPage <= pdf.numPages) {
@@ -894,6 +1076,7 @@ export default function PdfPractice() {
                             if (nextPage <= pdf.numPages) {
                               console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
                               setLastManualAdvance(nextPage)
+                              setIsIntentionalPageChange(true) // Mark as intentional page change
                               setPageNum(nextPage)
                               return 0
                             }
@@ -903,31 +1086,24 @@ export default function PdfPractice() {
                         })
                       }}
                       disabled={(() => {
-                        const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
-                        const isLastQuestionOnPage = qIdx === pageQuestions.length - 1
+                        const currentAnswer = answers[current?.id]
                         
-                        // Button is disabled if:
-                        // 1. Current question is not answered, OR
-                        // 2. All questions are answered but user is not on last question of page
-                        return answers[current?.id] === undefined || 
-                               (allAnswered && !isLastQuestionOnPage)
+                        // Button is disabled if current question is not answered
+                        return currentAnswer === undefined
                       })()}
                     >
                     {(() => {
                       const allAnswered = pageQuestions.every(q => answers[q.id] !== undefined)
                       const isLastQuestionOnPage = qIdx === pageQuestions.length - 1
-                      const isLastQuestion = 
-                        (subject === 'english' && currentNum === 75) ||
-                        (subject === 'math' && currentNum === 60) ||
-                        (subject === 'reading' && currentNum === 40)
+                      const isLastQuestion = testConfig && currentNum === testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions
                       
                       // Check if this is the final question of the test
                       if (allAnswered && isLastQuestion) {
                         return 'See Results'
                       }
                       
-                      // Check if all questions on current page are answered AND user is on last question of page
-                      if (allAnswered && isLastQuestionOnPage) {
+                      // Check if user is on last question of page (regardless of whether all questions on this page are answered)
+                      if (isLastQuestionOnPage) {
                         return 'Next Page'
                       }
                       

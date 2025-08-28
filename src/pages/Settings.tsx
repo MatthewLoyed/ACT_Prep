@@ -6,31 +6,86 @@ import {
   SpeakerLow
 } from '@phosphor-icons/react'
 import ColorSchemeSwitcher from '../components/ColorSchemeSwitcher'
+import { supabase } from '../lib/supabase'
 
 export default function Settings() {
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState(50)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
 
 
-  // Load settings from localStorage on component mount
+  // Load settings from Supabase on component mount
   useEffect(() => {
-    const savedMuted = localStorage.getItem('soundMuted')
-    const savedVolume = localStorage.getItem('soundVolume')
-    
-    if (savedMuted !== null) {
-      setIsMuted(savedMuted === 'true')
+    const loadSettings = async () => {
+      try {
+        console.log('🔧 Loading settings from Supabase...')
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('sound_muted, sound_volume')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Error loading settings:', error)
+          return
+        }
+        
+        console.log('🔧 Loaded settings from Supabase:', data)
+        
+        if (data) {
+          if (data.sound_muted !== null) {
+            console.log('🔧 Setting muted to:', data.sound_muted)
+            setIsMuted(data.sound_muted)
+          }
+          if (data.sound_volume !== null) {
+            console.log('🔧 Setting volume to:', data.sound_volume)
+            setVolume(data.sound_volume)
+          }
+        } else {
+          console.log('🔧 No settings found in Supabase, using defaults')
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error)
+      } finally {
+        setIsLoaded(true)
+      }
     }
     
-    if (savedVolume !== null) {
-      setVolume(parseInt(savedVolume))
-    }
+    loadSettings()
   }, [])
 
-  // Save settings to localStorage when they change
+  // Save settings to Supabase when they change (only after initial load)
   useEffect(() => {
-    localStorage.setItem('soundMuted', String(isMuted))
-    localStorage.setItem('soundVolume', String(volume))
-  }, [isMuted, volume])
+    if (!isLoaded) return // Don't save until we've loaded initial settings
+    
+    const saveSettings = async () => {
+      console.log('🔧 Saving settings to Supabase:', { isMuted, volume })
+      setIsSaving(true)
+      try {
+        const { error } = await supabase
+          .from('user_preferences')
+          .upsert({ 
+            sound_muted: isMuted,
+            sound_volume: volume,
+            created_at: new Date().toISOString()
+          })
+        
+        if (error) {
+          console.error('Error saving settings:', error)
+        } else {
+          console.log('🔧 Settings saved successfully')
+        }
+      } catch (error) {
+        console.error('Error saving settings:', error)
+      } finally {
+        setIsSaving(false)
+      }
+    }
+    
+    saveSettings()
+  }, [isMuted, volume, isLoaded])
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume)
@@ -92,10 +147,18 @@ export default function Settings() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
           >
-            <div className="flex items-center gap-3 mb-4">
-              <SpeakerHigh className="w-6 h-6 text-white" weight="fill" />
-              <h2 className="text-2xl font-bold text-white">Sound Effects</h2>
-            </div>
+                         <div className="flex items-center justify-between mb-4">
+               <div className="flex items-center gap-3">
+                 <SpeakerHigh className="w-6 h-6 text-white" weight="fill" />
+                 <h2 className="text-2xl font-bold text-white">Sound Effects</h2>
+               </div>
+               {isSaving && (
+                 <div className="flex items-center gap-2 text-green-400 text-sm">
+                   <div className="w-3 h-3 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                   Saving...
+                 </div>
+               )}
+             </div>
             
             <div className="space-y-4">
               {/* Mute Toggle */}

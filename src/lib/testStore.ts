@@ -9,6 +9,7 @@ export type TestBundle = {
   pdfData?: string // Base64 encoded PDF data
   sectionPages?: Partial<Record<SectionId, number>> // Store the page number where each section starts
   pageQuestions?: Partial<Record<SectionId, Record<number, string[]>>> // Store which questions are on which pages
+  answers?: Record<string, number> // Store user answers for resume functionality
 }
 
 const TESTS_KEY = 'tests'

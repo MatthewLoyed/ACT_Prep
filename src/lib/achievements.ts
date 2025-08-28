@@ -1,4 +1,6 @@
 // Achievement system for the ACT prep app
+import { supabase } from './supabase'
+
 export type Achievement = {
   id: string
   title: string
@@ -181,9 +183,9 @@ export const ACHIEVEMENTS: Achievement[] = [
 ]
 
 // Achievement management functions
-export function checkAchievements(stats: UserStats): Achievement[] {
+export async function checkAchievements(stats: UserStats): Promise<Achievement[]> {
   const earnedAchievements: Achievement[] = []
-  const existingAchievements = loadUserAchievements()
+  const existingAchievements = await loadUserAchievements()
   const existingIds = new Set(existingAchievements.map(a => a.id))
   
   for (const achievement of ACHIEVEMENTS) {
@@ -198,26 +200,47 @@ export function checkAchievements(stats: UserStats): Achievement[] {
   return earnedAchievements
 }
 
-export function loadUserAchievements(): Achievement[] {
+export async function loadUserAchievements(): Promise<Achievement[]> {
   try {
-    const stored = localStorage.getItem('userAchievements')
-    return stored ? JSON.parse(stored) : []
+    const { data } = await supabase
+      .from('user_achievements')
+      .select('*')
+      .order('earned_at', { ascending: false })
+    
+    return data || []
   } catch (error) {
     console.error('Error loading achievements:', error)
     return []
   }
 }
 
-export function saveUserAchievements(achievements: Achievement[]): void {
+export async function saveUserAchievements(achievements: Achievement[]): Promise<void> {
   try {
-    localStorage.setItem('userAchievements', JSON.stringify(achievements))
+    // For simplicity, replace all achievements
+    await supabase
+      .from('user_achievements')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+    
+    if (achievements.length > 0) {
+      await supabase
+        .from('user_achievements')
+        .insert(achievements.map(achievement => ({
+          id: achievement.id,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          category: achievement.category,
+          earned_at: achievement.earnedAt
+        })))
+    }
   } catch (error) {
     console.error('Error saving achievements:', error)
   }
 }
 
-export function addNewAchievements(newAchievements: Achievement[]): void {
-  const existing = loadUserAchievements()
+export async function addNewAchievements(newAchievements: Achievement[]): Promise<void> {
+  const existing = await loadUserAchievements()
   const existingIds = new Set(existing.map(a => a.id))
   
   // Only add achievements that don't already exist
@@ -225,12 +248,12 @@ export function addNewAchievements(newAchievements: Achievement[]): void {
   
   if (uniqueNewAchievements.length > 0) {
     const updated = [...existing, ...uniqueNewAchievements]
-    saveUserAchievements(updated)
+    await saveUserAchievements(updated)
   }
 }
 
-export function cleanDuplicateAchievements(): void {
-  const existing = loadUserAchievements()
+export async function cleanDuplicateAchievements(): Promise<void> {
+  const existing = await loadUserAchievements()
   const seen = new Set<string>()
   const unique = existing.filter(achievement => {
     if (seen.has(achievement.id)) {
@@ -241,23 +264,23 @@ export function cleanDuplicateAchievements(): void {
   })
   
   if (unique.length !== existing.length) {
-    saveUserAchievements(unique)
+    await saveUserAchievements(unique)
     console.log(`🧹 Cleaned up ${existing.length - unique.length} duplicate achievements`)
   }
 }
 
-export function clearAllAchievements(): void {
-  saveUserAchievements([])
+export async function clearAllAchievements(): Promise<void> {
+  await saveUserAchievements([])
   console.log('🗑️ Cleared all achievements')
 }
 
-export function getAchievementProgress(_stats: UserStats): {
+export async function getAchievementProgress(_stats: UserStats): Promise<{
   earned: Achievement[]
   available: Achievement[]
   total: number
   earnedCount: number
-} {
-  const userAchievements = loadUserAchievements()
+}> {
+  const userAchievements = await loadUserAchievements()
   const earnedIds = new Set(userAchievements.map(a => a.id))
   
   const earned = userAchievements

@@ -11,7 +11,7 @@ import {
   Brain,
   Star
 } from '@phosphor-icons/react'
-import { loadTestFromLocalStorage } from '../lib/localTestStore'
+import { loadTestFromSupabase } from '../lib/simpleSupabaseStorage'
 
 type SectionId = 'english' | 'math' | 'reading' | 'science'
 
@@ -48,7 +48,7 @@ export default function TestReview() {
       
       try {
         setLoading(true)
-        const loadedTest = await loadTestFromLocalStorage(testId)
+        const loadedTest = await loadTestFromSupabase(testId)
         
         // Parse answers from URL
         const parsedAnswers = JSON.parse(decodeURIComponent(answersParam))

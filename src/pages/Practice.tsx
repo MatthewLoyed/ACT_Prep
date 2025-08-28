@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { listTestsFromLocalStorage, setActiveTestId, deleteTestFromLocalStorage, clearAllTestsFromLocalStorage } from '../lib/localTestStore'
+import { listTestsFromSupabase, deleteTestFromSupabase, clearAllTestsFromSupabase } from '../lib/simpleSupabaseStorage'
 import { 
   FileText,
   Trash,
   Play,
-  Clock
+  Clock,
+  ArrowClockwise
 } from '@phosphor-icons/react'
 import EngagingLoader from '../components/EngagingLoader'
 
@@ -17,6 +18,8 @@ type Test = {
   createdAt: string
   sections: Record<string, unknown[]>
   pdfData?: string
+  progress?: any
+  answers?: Record<string, number>
 }
 
 export default function Practice() {
@@ -32,10 +35,20 @@ export default function Practice() {
   const loadTests = async () => {
     try {
       setLoading(true)
-      const testsList = await listTestsFromLocalStorage()
-      setTests(testsList as Test[])
+      const testsList = await listTestsFromSupabase()
+      
+      // Convert to the expected format
+      const convertedTests = testsList.map(test => ({
+        id: test.id,
+        name: test.name,
+        createdAt: test.createdAt,
+        sections: {}, // We'll load this when needed
+        hasProgress: test.hasProgress
+      }))
+      
+      setTests(convertedTests as Test[])
     } catch (error) {
-      console.error('Failed to load tests:', error)
+      console.error('Failed to load tests from Supabase:', error)
     } finally {
       setLoading(false)
     }
@@ -43,7 +56,8 @@ export default function Practice() {
 
   const handleTestSelect = (testId: string) => {
     setSelectedTestId(testId)
-    setActiveTestId(testId)
+    // No need to set active test ID for Supabase system
+    console.log('✅ Selected test:', testId)
   }
 
   const handleStartTest = () => {
@@ -103,7 +117,7 @@ export default function Practice() {
             >
                                                                            <div className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
                   selectedTestId === test.id 
-                    ? 'ring-2 ring-[var(--color-accent)] shadow-xl scale-[1.02] bg-gradient-to-br from-[var(--color-accent)]/10 to-[var(--color-accent-dark)]/10' 
+                    ? 'ring-2 ring-[var(--color-accent)] shadow-2xl scale-[1.02] bg-gradient-to-br from-[var(--color-accent)]/10 to-[var(--color-accent-dark)]/10 shadow-[0_0_20px_var(--color-accent),0_0_40px_var(--color-accent),0_0_60px_var(--color-accent)]' 
                     : 'hover:shadow-lg'
                 }`} 
                 onClick={() => handleTestSelect(test.id)}>
@@ -142,14 +156,17 @@ export default function Practice() {
                   </div>
                                      {selectedTestId === test.id && (
                      <div className="flex items-center gap-2">
-                                                                                               <div className="text-[var(--color-text-dark)] font-semibold px-3 py-1 rounded-full shadow-md" style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}>✓ Selected</div>
-                                                                       <button 
+                       <div className="text-[var(--color-text-dark)] font-semibold px-3 py-1 rounded-full shadow-md" style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}>✓ Selected</div>
+                       
+
+                       
+                       <button 
                           className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2"
                           onClick={async (e) => {
                             e.stopPropagation()
                             if (confirm('Are you sure you want to delete this test? This action cannot be undone.')) {
                               try {
-                                await deleteTestFromLocalStorage(test.id)
+                                await deleteTestFromSupabase(test.id)
                                 await loadTests() // Reload the tests list
                                 if (selectedTestId === test.id) {
                                   setSelectedTestId(null)
@@ -177,27 +194,47 @@ export default function Practice() {
             className="mt-6 text-center"
           >
             <div className="flex items-center justify-center gap-4">
-              {selectedTestId && (
-                <button
-                  className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center gap-2"
-                  onClick={handleStartTest}
-                >
-                  <Play className="w-5 h-5" weight="fill" />
-                  Start Test
-                </button>
-              )}
-                             <button
+              {selectedTestId && (() => {
+                const selectedTest = tests.find(t => t.id === selectedTestId)
+                const hasProgress = selectedTest?.hasProgress || false
+                
+                return (
+                  <button
+                    className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center gap-2"
+                    onClick={handleStartTest}
+                  >
+                    {hasProgress ? (
+                      <>
+                        <ArrowClockwise className="w-5 h-5" weight="fill" />
+                        Resume
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-5 h-5" weight="fill" />
+                        Start Test
+                      </>
+                    )}
+                  </button>
+                )
+              })()}
+              
+
+              
+              <button
                  className="btn btn-ghost btn-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                  onClick={async () => {
-                   if (confirm('Are you sure you want to clear all tests? This action cannot be undone.')) {
+                   if (confirm('Are you sure you want to clear all tests? This will delete ALL test data from Supabase. This action cannot be undone.')) {
                      try {
-                       await clearAllTestsFromLocalStorage()
-                       setTests([])
+                       console.log('🔄 Starting clear all tests...')
+                       await clearAllTestsFromSupabase()
+                       console.log('🔄 Reloading tests list...')
+                       await loadTests()
                        setSelectedTestId(null)
-                       console.log('All tests cleared successfully from database')
+                       console.log('✅ All tests cleared successfully from Supabase')
+                       alert('✅ All tests cleared successfully!')
                      } catch (error) {
-                       console.error('Failed to clear all tests:', error)
-                       alert('Failed to clear all tests. Please try again.')
+                       console.error('❌ Failed to clear all tests:', error)
+                       alert(`❌ Failed to clear all tests: ${error instanceof Error ? error.message : 'Unknown error'}`)
                      }
                    }
                  }}

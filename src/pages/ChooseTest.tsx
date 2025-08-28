@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listTestsFromLocalStorage, setActiveTestId, getActiveTestId } from '../lib/localTestStore'
+import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
 
 export default function ChooseTest() {
   const navigate = useNavigate()
   const [tests, setTests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [active, setActive] = useState<string | null>(() => getActiveTestId())
+  const [active, setActive] = useState<string | null>(null)
 
   useEffect(() => {
     loadTests()
@@ -15,7 +15,7 @@ export default function ChooseTest() {
   const loadTests = async () => {
     try {
       setLoading(true)
-      const testsList = await listTestsFromLocalStorage()
+      const testsList = await listTestsFromSupabase()
       setTests(testsList)
     } catch (error) {
       console.error('Failed to load tests:', error)
@@ -42,7 +42,7 @@ export default function ChooseTest() {
                 onClick={() => {
                   const newId = active === t.id ? null : t.id
                   setActive(newId)
-                  setActiveTestId(newId as any)
+                  // Active test ID management removed - using local state only
                 }}
               >
                 <div className="text-left">
@@ -84,7 +84,7 @@ export default function ChooseTest() {
         </button>
         <button
           className="btn btn-ghost ml-2"
-          onClick={() => { setActive(null); setActiveTestId(null as any) }}
+          onClick={() => { setActive(null) }}
         >
           Clear selected
         </button>

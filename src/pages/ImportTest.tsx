@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
-import { getNextDefaultName, saveTestToLocalStorage, listTestsFromLocalStorage } from '../lib/localTestStore'
+import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
+import { getNextDefaultName } from '../lib/testStore'
+import { saveTestToSupabase } from '../lib/simpleSupabaseStorage'
 import EngagingLoader from '../components/EngagingLoader'
 import { parsePdf, type Extracted } from '../lib/pdfParser'
 
@@ -75,18 +77,18 @@ export default function ImportTest() {
         })
         
         try {
-          const saved = await saveTestToLocalStorage({ 
+          const saved = await saveTestToSupabase({ 
             name, 
             sections: sectionsRecord, 
             pdfData: base64,
             sectionPages,
             pageQuestions
           })
-          setStatus(`✅ Auto-saved as "${saved.name}"! (${format} format: ${reason})`)
+          setStatus(`✅ Auto-saved to Supabase as "${saved.name}"! (${format} format: ${reason})`)
           setImportedTestId(saved.id) // Store the test ID for navigation
         } catch (error) {
           console.error('Failed to save test:', error)
-          setStatus(`❌ ${error instanceof Error ? error.message : 'Failed to save test. Please clear some tests and try again.'}`)
+          setStatus(`❌ ${error instanceof Error ? error.message : 'Failed to save test to Supabase.'}`)
           setHasError(true)
         }
       } else {
@@ -107,7 +109,7 @@ export default function ImportTest() {
     let counter = 1
     
     // Get existing tests to check for name conflicts
-    const existingTests = await listTestsFromLocalStorage()
+    const existingTests = await listTestsFromSupabase()
     const existingNames = new Set(existingTests.map((test: any) => test.name))
     
     // Check if name already exists and add suffix if needed

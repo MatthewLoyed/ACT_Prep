@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getActiveTest } from '../lib/testStore'
+import { supabase } from '../lib/supabase'
 
 type Question = {
   id: string
@@ -86,19 +87,21 @@ export default function FullTest() {
     }
   }
 
-  function finish() {
+  async function finish() {
     // save session to history
     try {
-      const sessions = JSON.parse(localStorage.getItem('sessions') ?? '[]') as any[]
-      sessions.push({
-        date: new Date().toISOString(),
-        section: 'full',
-        rawScore: score,
-        total: totalCount,
-        durationSec: totalSeconds - secondsLeft,
-      })
-      localStorage.setItem('sessions', JSON.stringify(sessions))
-    } catch {}
+      await supabase
+        .from('sessions')
+        .insert({
+          date: new Date().toISOString(),
+          section: 'full',
+          rawScore: score,
+          total: totalCount,
+          durationSec: totalSeconds - secondsLeft,
+        })
+    } catch (error) {
+      console.error('Error saving session:', error)
+    }
     navigate('/summary', { state: { score, total: totalCount } })
   }
 

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { loadTestFromLocalStorage } from '../lib/localTestStore'
+import { loadTestFromSupabase, findEarliestUnansweredQuestion } from '../lib/simpleSupabaseStorage'
 import { useEffect, useState } from 'react'
 import { 
   BookOpen,
@@ -16,7 +16,7 @@ import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
 const subjectConfig = {
   english: { 
     title: 'English', 
-    color: 'from-[var(--color-primary)] to-[var(--color-primary-dark)]', 
+    color: 'from-[var(--color-accent)] to-[var(--color-accent-dark)]', 
     icon: BookOpen
   },
   math: { 
@@ -26,12 +26,12 @@ const subjectConfig = {
   },
   reading: { 
     title: 'Reading', 
-    color: 'from-[var(--color-primary-light)] to-[var(--color-primary)]', 
+    color: 'from-[var(--color-accent)] to-[var(--color-accent-dark)]', 
     icon: FileText
   },
   science: { 
     title: 'Science', 
-    color: 'from-[var(--color-accent-light)] to-[var(--color-accent)]', 
+    color: 'from-[var(--color-accent)] to-[var(--color-accent-dark)]', 
     icon: Flask
   }
 }
@@ -63,16 +63,31 @@ export default function TestSelection() {
   const loadTest = async () => {
     try {
       setLoading(true)
-      const loadedTest = await loadTestFromLocalStorage(testId!)
-      setTest(loadedTest)
+      const loadedTest = await loadTestFromSupabase(testId!)
       
-      // Determine test type and get configuration
       if (loadedTest) {
-        const config = getTestTypeConfig(loadedTest)
+        // Convert to TestBundle format for compatibility
+        const testBundle = {
+          id: loadedTest.id,
+          name: loadedTest.name,
+          createdAt: loadedTest.createdAt,
+          sections: loadedTest.sections,
+          pdfData: loadedTest.pdfData,
+          sectionPages: loadedTest.sectionPages,
+          pageQuestions: loadedTest.pageQuestions,
+          answers: loadedTest.answers // Add the answers field for resume functionality
+        }
+        setTest(testBundle)
+        
+        // Determine test type and get configuration
+        const config = getTestTypeConfig(testBundle)
         setTestConfig(config)
+      } else {
+        setTest(null)
       }
     } catch (error) {
-      console.error('Failed to load test:', error)
+      console.error('Failed to load test from Supabase:', error)
+      setTest(null)
     } finally {
       setLoading(false)
     }
@@ -120,8 +135,16 @@ export default function TestSelection() {
       return
     }
     
-    // Navigate to PDF practice for this subject with testId
-    navigate(`/pdf-practice/${subjectId}?testId=${testId}`)
+         // Check for progress and find earliest unanswered question
+     const earliestUnanswered = findEarliestUnansweredQuestion(test, subjectId)
+     
+     if (earliestUnanswered && earliestUnanswered.section === subjectId) {
+       // Resume to the earliest unanswered question in this subject
+       navigate(`/pdf-practice/${subjectId}?testId=${testId}&resume=true&questionIndex=${earliestUnanswered.questionIndex}`)
+     } else {
+       // Start fresh for this subject
+       navigate(`/pdf-practice/${subjectId}?testId=${testId}`)
+     }
   }
 
   if (!testConfig) {
@@ -196,40 +219,62 @@ export default function TestSelection() {
                     )}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
                   </div>
-                  <div className="p-5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold">{s.title}</h3>
-                                                 <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                                             <div className="flex-1">
+                         <h3 className="text-2xl font-bold text-left bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-dark)] bg-clip-text text-transparent mb-1">{s.title}</h3>
+                         <p className="text-sm text-slate-600 dark:text-slate-400 text-left">
                            {s.time} • {s.questions} questions
                          </p>
-                      </div>
+                       </div>
                       {isAvailable && (
-                        <span className="opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-1 text-2xl">→</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-1 text-2xl ml-2">→</span>
                       )}
                     </div>
-                    <p className="text-slate-700 dark:text-slate-300">{s.description}</p>
                     
-                    {isAvailable ? (
-                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="inline-block rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5">
-                          {questionCount} questions available
-                        </span>
-                        <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5">PDF Practice</span>
-                      </div>
-                    ) : s.id === 'science' && !test.sections?.science ? (
-                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="inline-block rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-2 py-0.5">
-                          Coming Soon
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="inline-block rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-2 py-0.5">
-                          Not available in this test
-                        </span>
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <p className="text-slate-700 dark:text-slate-300 text-left">{s.description}</p>
+                      
+                      {isAvailable ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="inline-block rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5">
+                            {questionCount} questions available
+                          </span>
+                          
+                          {/* Show progress indicator if there are answers for this subject */}
+                          {(() => {
+                            const subjectAnswers = Object.keys(test.answers || {}).filter(qId => {
+                              const sectionQuestions = test.sections[s.id] as any[] || []
+                              return sectionQuestions.some(q => q.id === qId)
+                            })
+                            const answeredCount = subjectAnswers.length
+                            
+                            if (answeredCount > 0) {
+                              return (
+                                <span className="inline-block rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5">
+                                  {answeredCount} answered
+                                </span>
+                              )
+                            }
+                            return null
+                          })()}
+                          
+                          <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5">PDF Practice</span>
+                        </div>
+                      ) : s.id === 'science' && !test.sections?.science ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="inline-block rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-2 py-0.5">
+                            Coming Soon
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="inline-block rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-2 py-0.5">
+                            Not available in this test
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </button>
