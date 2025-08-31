@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ChooseTest() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [tests, setTests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [active, setActive] = useState<string | null>(null)
 
+  // Authentication check
   useEffect(() => {
-    loadTests()
-  }, [])
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
+
+  useEffect(() => {
+    if (user) {
+      loadTests()
+    }
+  }, [user])
 
   const loadTests = async () => {
     try {

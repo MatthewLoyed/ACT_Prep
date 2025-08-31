@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
@@ -8,6 +8,7 @@ import { saveTestToSupabase } from '../lib/simpleSupabaseStorage'
 import EngagingLoader from '../components/EngagingLoader'
 import SuccessAnimation from '../components/SuccessAnimation'
 import { parsePdf, type Extracted } from '../lib/pdfParser'
+import { useAuth } from '../contexts/AuthContext'
 
 // Configure pdfjs worker from local node_modules to avoid CDN import failures
 // Use local worker to avoid CDN issues
@@ -18,15 +19,25 @@ GlobalWorkerOptions.workerSrc = pdfWorker
 
 export default function ImportTest() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [status, setStatus] = useState<string>('Drop a PDF or choose a file to parse…')
+  const [status, setStatus] = useState<string>('Drop your ACT® practice test here or click to browse…')
 
   const [isProcessing, setIsProcessing] = useState(false)
   const [hasError, setHasError] = useState(false)
   const [importedTestId, setImportedTestId] = useState<string | null>(null)
   const [showSuccessIcons, setShowSuccessIcons] = useState(false)
+  const [showTestTypeModal, setShowTestTypeModal] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
-  async function processPdf(file: File) {
+  // Authentication check
+  useEffect(() => {
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
+
+  async function processPdf(file: File, testType: 'enhanced' | 'old') {
     try {
       setIsProcessing(true)
       setHasError(false)
@@ -45,8 +56,8 @@ export default function ImportTest() {
       
       setStatus('Detecting format and parsing...')
       
-      // Use the new parser system
-      const { results: finalResults, format, reason } = await parsePdf(file)
+      // Use the new parser system with test type
+      const { results: finalResults, format, reason } = await parsePdf(file, testType)
       
 
       
@@ -84,7 +95,8 @@ export default function ImportTest() {
             sections: sectionsRecord, 
             pdfData: base64,
             sectionPages,
-            pageQuestions
+            pageQuestions,
+            testType: testType // Pass the selected test type
           })
           setStatus(`✅ Auto-saved to Supabase as "${saved.name}"! (${format} format: ${reason})`)
           setImportedTestId(saved.id) // Store the test ID for navigation
@@ -137,7 +149,8 @@ export default function ImportTest() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      processPdf(file)
+      setSelectedFile(file)
+      setShowTestTypeModal(true)
     }
   }
 
@@ -145,7 +158,8 @@ export default function ImportTest() {
     event.preventDefault()
     const file = event.dataTransfer.files[0]
     if (file && file.type === 'application/pdf') {
-      processPdf(file)
+      setSelectedFile(file)
+      setShowTestTypeModal(true)
     }
   }
 
@@ -197,7 +211,7 @@ export default function ImportTest() {
                 <>
                   <div className="text-6xl mb-4">📄</div>
                   <h2 className="text-2xl font-semibold mb-4">
-                    {hasError ? '❌ Try Again' : 'Choose PDF File'}
+                    {hasError ? '❌ Try Again' : 'Select Your Test'}
                   </h2>
                   <p className="text-secondary mb-6">
                     {status}
@@ -221,7 +235,7 @@ export default function ImportTest() {
                         : 'btn-primary'
                     }`}
                   >
-                    {hasError ? '🔄 Choose Different File' : 'Choose PDF File'}
+                    {hasError ? '🔄 Try Again' : 'Browse Files'}
                   </button>
                 </>
               )}
@@ -369,6 +383,67 @@ export default function ImportTest() {
 
 
       </div>
+
+      {/* Test Type Selection Modal */}
+      {showTestTypeModal && selectedFile && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="card p-8 max-w-md mx-4"
+          >
+            <div className="text-center">
+              <div className="text-4xl mb-4">📄</div>
+              <h3 className="text-xl font-bold mb-4">Select Test Type</h3>
+              <p className="text-secondary mb-6">
+                What type of ACT® test is this?
+              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                File: <span className="font-mono text-[var(--color-accent)] font-semibold">{selectedFile?.name}</span>
+              </p>
+              
+              <div className="space-y-4">
+                <button
+                  onClick={() => {
+                    setShowTestTypeModal(false)
+                    processPdf(selectedFile, 'enhanced')
+                  }}
+                  className="w-full btn btn-ghost btn-lg border border-white/30 hover:bg-white/20 transition-all duration-200"
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">Enhanced ACT®</div>
+                    <div className="text-sm opacity-75">2025 - Present (New Format)</div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowTestTypeModal(false)
+                    processPdf(selectedFile, 'old')
+                  }}
+                  className="w-full btn btn-ghost btn-lg border border-white/30 hover:bg-white/20 transition-all duration-200"
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">Old ACT®</div>
+                    <div className="text-sm opacity-75">Pre-2025 (Classic Format)</div>
+                  </div>
+                </button>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setShowTestTypeModal(false)
+                  setSelectedFile(null)
+                }}
+                className="mt-4 text-sm text-secondary hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   )
 }

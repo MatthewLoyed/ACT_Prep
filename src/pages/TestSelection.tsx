@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import EngagingLoader from '../components/EngagingLoader'
 import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
+import { useAuth } from '../contexts/AuthContext'
 
 // Subject configuration with icons and colors
 const subjectConfig = {
@@ -50,15 +51,23 @@ const getFullTestOption = (testConfig: TestTypeConfig) => ({
 export default function TestSelection() {
   const { testId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [test, setTest] = useState<any>(null)
   const [testConfig, setTestConfig] = useState<TestTypeConfig | null>(null)
   const [loading, setLoading] = useState(true)
   
+  // Authentication check
   useEffect(() => {
-    if (testId) {
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
+  
+  useEffect(() => {
+    if (testId && user) {
       loadTest()
     }
-  }, [testId])
+  }, [testId, user])
   
   const loadTest = async () => {
     try {

@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const subjects = [
   { id: 'english', title: 'English', color: 'from-rose-400 to-rose-600', blurb: 'Grammar, usage, punctuation, and rhetorical skills.' },
@@ -9,6 +12,16 @@ const subjects = [
 ]
 
 export default function SubjectSelect() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  // Authentication check
+  useEffect(() => {
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
+
   return (
     <div className="container">
               <div className="text-center mb-8">

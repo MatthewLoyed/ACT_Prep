@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate 
 import { AnimatePresence, motion } from 'framer-motion'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import AuthCallback from './components/AuthCallback'
+import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 
 const Landing = lazy(() => import('./pages/Landing'))
@@ -22,6 +23,7 @@ const PdfPracticeSetup = lazy(() => import('./pages/PdfPracticeSetup'))
 const TestReview = lazy(() => import('./pages/TestReview'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Tips = lazy(() => import('./pages/Tips'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 
 function App() {
   const [darkMode, setDarkMode] = useState<boolean>(false)
@@ -92,6 +94,9 @@ function App() {
                   <SubjectSelect />
                 </PageFade>} />
 
+                <Route path="/dashboard" element={<PageFade>
+                  <Dashboard />
+                </PageFade>} />
                 <Route path="/full-test-setup" element={<PageFade>
                   <FullTestSetup />
                 </PageFade>} />
@@ -134,6 +139,7 @@ function App() {
             </AnimatePresence>
           </Suspense>
         </main>
+        <Analytics />
       </div>
       </BrowserRouter>
     </AuthProvider>
@@ -241,13 +247,18 @@ function Nav() {
   return (
     <nav className="flex items-center gap-4 ml-auto">
       {/* Desktop Navigation */}
-      {link('/', 'Home')}
+      {!user && link('/', 'Home')}
       {user ? (
         <>
+          <button
+            className="hidden sm:inline-flex items-center rounded-xl px-6 py-3 text-lg font-bold text-white/60 font-extrabold text-shadow-xl cursor-not-allowed transition-all duration-200"
+            disabled
+          >
+            Dashboard (Coming Soon)
+          </button>
           {link('/import', 'Import')}
           {link('/practice', 'Practice')}
           {link('/tips', 'Tips')}
-          {link('/history', 'History')}
           {link('/settings', 'Settings')}
           <button
             onClick={handleSignOut}
@@ -277,13 +288,18 @@ function Nav() {
       {isMobileMenuOpen && (
         <div className="absolute top-full left-0 right-0 bg-white/10 backdrop-blur-xl border-b border-white/20 sm:hidden">
           <div className="flex flex-col p-4 space-y-2">
-            {link('/', 'Home', true)}
+            {!user && link('/', 'Home', true)}
             {user ? (
               <>
+                <button
+                  className="block w-full text-left px-4 py-2 text-white/60 cursor-not-allowed transition-colors"
+                  disabled
+                >
+                  Dashboard (Coming Soon)
+                </button>
                 {link('/import', 'Import', true)}
                 {link('/practice', 'Practice', true)}
                 {link('/tips', 'Tips', true)}
-                {link('/history', 'History', true)}
                 {link('/settings', 'Settings', true)}
                 <button
                   onClick={() => {

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const subjects = [
   { id: 'english', title: 'English' },
@@ -10,8 +11,16 @@ const subjects = [
 
 export default function PdfPracticeSetup() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [subject, setSubject] = useState('english')
   const [url, setUrl] = useState('')
+
+  // Authentication check
+  useEffect(() => {
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
 
   return (
     <div className="max-w-2xl mx-auto">

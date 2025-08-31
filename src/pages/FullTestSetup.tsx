@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function FullTestSetup() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [minutes, setMinutes] = useState<number>(120)
+
+  // Authentication check
+  useEffect(() => {
+    if (!user) {
+      navigate('/')
+    }
+  }, [user, navigate])
 
   const start = () => {
     navigate(`/full-test?t=${minutes * 60}`)

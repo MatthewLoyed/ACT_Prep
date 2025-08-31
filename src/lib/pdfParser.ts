@@ -6,23 +6,38 @@ import { parseOtherPdf, type Extracted as OtherExtracted } from './otherParser'
 
 export type Extracted = EnhancedActExtracted | OldActExtracted | OtherExtracted
 
-export async function parsePdf(file: File): Promise<{
+export async function parsePdf(file: File, testType?: 'enhanced' | 'old'): Promise<{
   results: Extracted[]
   format: TestFormat
   reason: string
 }> {
-  // Detect format based on filename
-  const detection = detectFormat(file.name)
-
   let results: Extracted[] = []
+  let format: TestFormat
+  let reason: string
 
   try {
-    if (detection.format === 'enhanced_act') {
+    if (testType === 'enhanced') {
       results = await parseEnhancedActPdf(file)
-    } else if (detection.format === 'old_act') {
+      format = 'enhanced_act'
+      reason = 'User selected Enhanced ACT format'
+    } else if (testType === 'old') {
       results = await parseOldActPdf(file)
+      format = 'old_act'
+      reason = 'User selected Old ACT format'
     } else {
-      results = await parseOtherPdf(file)
+      // Fallback to auto-detection if no test type provided
+      const detection = detectFormat(file.name)
+      
+      if (detection.format === 'enhanced_act') {
+        results = await parseEnhancedActPdf(file)
+      } else if (detection.format === 'old_act') {
+        results = await parseOldActPdf(file)
+      } else {
+        results = await parseOtherPdf(file)
+      }
+      
+      format = detection.format
+      reason = detection.reason
     }
   } catch (error) {
     console.error('Parser error:', error)
@@ -31,7 +46,7 @@ export async function parsePdf(file: File): Promise<{
 
   return {
     results,
-    format: detection.format,
-    reason: detection.reason
+    format,
+    reason
   }
 }

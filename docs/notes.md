@@ -97,6 +97,10 @@
 - **Sign Out Confirmation**: Add a confirmation dialog/modal when users click sign out to prevent accidental logouts
 - **Homepage Redesign for Authenticated Users**: Rethink the homepage experience after users are signed in - currently shows the same landing page as non-authenticated users
 
+### Critical Issues 🚨
+
+- **Old ACT Parser Broken**: The old ACT parser for ACT practice test 2016-17 is broken for every section except English. This affects Math, Reading, and Science sections. **CRITICAL ISSUE** - needs immediate attention for users with pre-2025 ACT tests.
+
 ### Performance Optimizations
 
 - Add loading states for better UX

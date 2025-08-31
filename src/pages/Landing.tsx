@@ -34,6 +34,13 @@ export default function Landing() {
   const [hasTests, setHasTests] = useState(false)
   const [isLoadingTests, setIsLoadingTests] = useState(false)
 
+  // Redirect authenticated users to practice page
+  useEffect(() => {
+    if (user) {
+      window.location.href = '/practice'
+    }
+  }, [user])
+
   // Check if user has tests when they're signed in
   useEffect(() => {
     if (user) {

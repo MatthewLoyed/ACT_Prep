@@ -13,6 +13,7 @@ export type SimpleTestData = {
   sectionPages?: Partial<Record<string, number>>
   pageQuestions?: Partial<Record<string, Record<number, string[]>>>
   answers: Record<string, number>
+  testType?: 'enhanced' | 'old' // Store the selected test type
   progress: {
     currentSection: string
     currentQuestionIndex: number
@@ -23,7 +24,7 @@ export type SimpleTestData = {
 }
 
 // Save a test to Supabase (everything included)
-export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'createdAt'>): Promise<SimpleTestData> {
+export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'createdAt'> & { testType?: 'enhanced' | 'old' }): Promise<SimpleTestData> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   
@@ -42,6 +43,7 @@ export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'crea
     sectionPages: testData.sectionPages,
     pageQuestions: testData.pageQuestions,
     answers: {},
+    testType: testData.testType,
     progress: {
       currentSection: 'english',
       currentQuestionIndex: 0,
@@ -67,6 +69,7 @@ export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'crea
       section_pages: fullTestData.sectionPages,
       page_questions: fullTestData.pageQuestions,
       answers: fullTestData.answers,
+      test_type: fullTestData.testType, // Store the test type
       progress: fullTestData.progress
     })
   
@@ -107,6 +110,7 @@ export async function loadTestFromSupabase(id: string): Promise<SimpleTestData |
     sectionPages: data.section_pages || {},
     pageQuestions: data.page_questions || {},
     answers: data.answers || {},
+    testType: data.test_type, // Load the test type
     progress: data.progress || {
       currentSection: 'english',
       currentQuestionIndex: 0,
@@ -120,10 +124,10 @@ export async function loadTestFromSupabase(id: string): Promise<SimpleTestData |
 }
 
 // List all tests from Supabase
-export async function listTestsFromSupabase(): Promise<Array<{ id: string; name: string; createdAt: string; hasProgress: boolean }>> {
+export async function listTestsFromSupabase(): Promise<Array<{ id: string; name: string; createdAt: string; hasProgress: boolean; testType?: 'enhanced' | 'old' }>> {
   const { data, error } = await supabase
     .from('tests')
-    .select('id, name, created_at, answers, progress')
+    .select('id, name, created_at, answers, progress, test_type')
     .order('created_at', { ascending: false })
   
   if (error) {
@@ -135,7 +139,8 @@ export async function listTestsFromSupabase(): Promise<Array<{ id: string; name:
     id: test.id,
     name: test.name,
     createdAt: test.created_at,
-    hasProgress: Object.keys(test.answers || {}).length > 0 || test.progress?.isCompleted
+    hasProgress: Object.keys(test.answers || {}).length > 0 || test.progress?.isCompleted,
+    testType: test.test_type
   }))
   
   return tests
