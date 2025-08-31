@@ -6,6 +6,7 @@ import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
 import { getNextDefaultName } from '../lib/testStore'
 import { saveTestToSupabase } from '../lib/simpleSupabaseStorage'
 import EngagingLoader from '../components/EngagingLoader'
+import SuccessAnimation from '../components/SuccessAnimation'
 import { parsePdf, type Extracted } from '../lib/pdfParser'
 
 // Configure pdfjs worker from local node_modules to avoid CDN import failures
@@ -23,6 +24,7 @@ export default function ImportTest() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [hasError, setHasError] = useState(false)
   const [importedTestId, setImportedTestId] = useState<string | null>(null)
+  const [showSuccessIcons, setShowSuccessIcons] = useState(false)
 
   async function processPdf(file: File) {
     try {
@@ -86,6 +88,7 @@ export default function ImportTest() {
           })
           setStatus(`✅ Auto-saved to Supabase as "${saved.name}"! (${format} format: ${reason})`)
           setImportedTestId(saved.id) // Store the test ID for navigation
+          setShowSuccessIcons(true) // Show success icons
         } catch (error) {
           console.error('Failed to save test:', error)
           setStatus(`❌ ${error instanceof Error ? error.message : 'Failed to save test to Supabase.'}`)
@@ -176,70 +179,158 @@ export default function ImportTest() {
           </p>
         </div>
 
-        {/* Main Upload Area */}
-        <div className="card p-8 mb-8">
-          <div
-            className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
-              hasError 
-                ? 'border-red-300 bg-red-500/20 animate-shake' 
-                : 'border-white/30 hover:border-white/50 hover:bg-white/10'
-            }`}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-          >
-            {isProcessing ? (
-              <EngagingLoader />
-            ) : (
-              <>
-                <div className="text-6xl mb-4">📄</div>
-                <h2 className="text-2xl font-semibold mb-4">
-                  {hasError ? '❌ Try Again' : 'Choose PDF File'}
-                </h2>
-                <p className="text-secondary mb-6">
-                  {status}
-                </p>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => inputRef.current?.click()}
-                  className={`btn btn-lg ${
-                    hasError 
-                      ? 'btn-error shadow-lg hover:shadow-xl transform hover:scale-105 animate-pulse' 
-                      : 'btn-primary'
-                  }`}
-                >
-                  {hasError ? '🔄 Choose Different File' : 'Choose PDF File'}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Success Actions - Moved up for better visibility */}
-        {importedTestId && !isProcessing && !hasError && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="card p-8 mb-8 text-center"
-          >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
-              🎉 Test Imported Successfully!
-            </h2>
-            <p className="text-secondary mb-6">
-              Your practice test is ready to use. Start practicing now!
-            </p>
-            <button
-              onClick={handleStartPracticing}
-              className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+        {/* Main Upload Area - Hidden after successful import */}
+        {!importedTestId && (
+          <div className="card p-8 mb-8">
+            <div
+              className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
+                hasError 
+                  ? 'border-red-300 bg-red-500/20 animate-shake' 
+                  : 'border-white/30 hover:border-white/50 hover:bg-white/10'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
             >
-              🚀 Start Practicing
-            </button>
-          </motion.div>
+              {isProcessing ? (
+                <EngagingLoader />
+              ) : (
+                <>
+                  <div className="text-6xl mb-4">📄</div>
+                  <h2 className="text-2xl font-semibold mb-4">
+                    {hasError ? '❌ Try Again' : 'Choose PDF File'}
+                  </h2>
+                  <p className="text-secondary mb-6">
+                    {status}
+                  </p>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    // Add performance optimizations
+                    multiple={false}
+                    // Prevent unnecessary re-renders
+                    key={isProcessing ? 'processing' : 'ready'}
+                  />
+                  <button
+                    onClick={() => inputRef.current?.click()}
+                    className={`btn btn-lg ${
+                      hasError 
+                        ? 'btn-error shadow-lg hover:shadow-xl transform hover:scale-105 animate-pulse' 
+                        : 'btn-primary'
+                    }`}
+                  >
+                    {hasError ? '🔄 Choose Different File' : 'Choose PDF File'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Success Actions - Enhanced with fun animations */}
+        {importedTestId && !isProcessing && !hasError && (
+          <div className="relative">
+            {/* Success Animation Overlay */}
+            <SuccessAnimation 
+              show={showSuccessIcons}
+              onComplete={() => setShowSuccessIcons(false)}
+            />
+
+            {/* Success Box Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ 
+                duration: 0.6,
+                type: "spring",
+                stiffness: 100
+              }}
+              className="card p-8 mb-8 text-center bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30"
+            >
+              {/* Success Celebration Animation */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ 
+                  duration: 0.8, 
+                  type: "spring",
+                  delay: 0.2
+                }}
+                className="text-6xl mb-4"
+              >
+                🎉
+              </motion.div>
+
+              <motion.h2 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="text-3xl font-bold mb-4"
+              >
+                <span className="text-white">
+                  Test Imported{' '}
+                </span>
+                <span className="text-emerald-400">
+                  Successfully
+                </span>
+                <span className="text-white">
+                  !
+                </span>
+              </motion.h2>
+              
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                className="text-lg text-secondary mb-8"
+              >
+                Your practice test is ready to use. Start practicing now!
+              </motion.p>
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8, duration: 0.5 }}
+                className="flex flex-col sm:flex-row gap-4 justify-center"
+              >
+                {/* Glowing Start Practicing Button */}
+                <motion.button
+                  onClick={handleStartPracticing}
+                  className="btn btn-primary btn-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  animate={{
+                    boxShadow: [
+                      '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
+                      '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
+                      '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
+                    ],
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  🚀 Start Practicing
+                </motion.button>
+                
+                <button
+                  onClick={() => {
+                    setImportedTestId(null)
+                    setStatus('Drop a PDF or choose a file to parse…')
+                    if (inputRef.current) {
+                      inputRef.current.value = ''
+                    }
+                  }}
+                  className="btn btn-ghost btn-lg border border-white/30 hover:bg-white/20 transition-all duration-200"
+                >
+                  📄 Upload Another Test
+                </button>
+              </motion.div>
+            </motion.div>
+          </div>
         )}
 
         {/* External Resources Section */}

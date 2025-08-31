@@ -11,6 +11,7 @@ import {
   PushPin
 } from '@phosphor-icons/react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 type UserTip = {
   id: string
@@ -20,6 +21,7 @@ type UserTip = {
 }
 
 export default function Tips() {
+  const { user } = useAuth()
   const [userTips, setUserTips] = useState<UserTip[]>([])
   const [newTip, setNewTip] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -29,10 +31,16 @@ export default function Tips() {
   // Load user tips from Supabase on component mount
   useEffect(() => {
     const loadTips = async () => {
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+
       try {
         const { data } = await supabase
           .from('user_tips')
           .select('*')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false })
         
         if (data) {
@@ -50,8 +58,10 @@ export default function Tips() {
       setTipsLoaded(true)
     }
     
-    loadTips()
-  }, [])
+    if (user) {
+      loadTips()
+    }
+  }, [user])
 
   // Track if tips have been loaded from Supabase
   const [tipsLoaded, setTipsLoaded] = useState(false)
@@ -59,7 +69,7 @@ export default function Tips() {
   // Save user tips to Supabase when they change
   useEffect(() => {
     // Don't save until tips have been loaded from Supabase
-    if (!tipsLoaded) {
+    if (!tipsLoaded || !user) {
       return
     }
     
@@ -70,12 +80,13 @@ export default function Tips() {
         await supabase
           .from('user_tips')
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+          .eq('user_id', user.id) // Only delete user's own tips
         
         if (userTips.length > 0) {
           await supabase
             .from('user_tips')
             .insert(userTips.map(tip => ({
+              user_id: user.id,
               id: tip.id,
               text: tip.text,
               created_at: tip.createdAt,
@@ -88,7 +99,7 @@ export default function Tips() {
     }
     
     saveTips()
-  }, [userTips, tipsLoaded])
+  }, [userTips, tipsLoaded, user])
 
   const addTip = () => {
     if (newTip.trim()) {
@@ -155,6 +166,27 @@ export default function Tips() {
       day: 'numeric',
       year: 'numeric'
     })
+  }
+
+  // Show login prompt if user is not authenticated
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="card p-8 text-center">
+          <div className="text-4xl mb-4">🔐</div>
+          <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
+          <p className="text-secondary mb-6">
+            Please sign in to view and manage your study tips.
+          </p>
+          <button 
+            onClick={() => window.location.href = '/login'}
+            className="btn btn-primary"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -6,9 +6,12 @@ import { loadTestFromSupabase, updateTestAnswers } from '../lib/simpleSupabaseSt
 import type { TestBundle } from '../lib/testStore'
 
 import { getTestTypeConfig, type TestTypeConfig } from '../lib/testConfig'
+import { useSoundSettings } from '../hooks/useSoundSettings'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 // Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
+function debounce<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -47,6 +50,7 @@ type Question = {
 }
 
 export default function PdfPractice() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { subject = 'english' } = useParams()
   const [params] = useSearchParams()
@@ -97,8 +101,7 @@ export default function PdfPractice() {
           
           // Determine test type and get configuration
           const config = getTestTypeConfig(testBundle)
-          console.log('🎯 DEBUG: Test config loaded:', config)
-          console.log('🎯 DEBUG: Subject config for', subject, ':', config?.subjects[subject as keyof typeof config.subjects])
+          
           setTestConfig(config)
         } else {
           setActive(null)
@@ -136,7 +139,13 @@ export default function PdfPractice() {
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [correctAudio] = useState(() => new Audio('/sounds/correct_answer.mp3'))
   const [wrongAudio] = useState(() => new Audio('/sounds/wrong_answer.wav'))
+  
+  // Session tracking for practice time
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  
+  // Sound settings hook
+  const { playAudio } = useSoundSettings()
   const [feedback, setFeedback] = useState<{ ok: boolean; id: string } | null>(null)
   const [streak, setStreak] = useState<number>(0)
   const [showStreakMessage, setShowStreakMessage] = useState<boolean>(false)
@@ -231,11 +240,11 @@ export default function PdfPractice() {
   const debouncedSave = useCallback(
     debounce(async (answersToSave: Record<string, number>) => {
       if (testId) {
-        console.log(`🎯 RESUME DEBUG: Auto-saving ${Object.keys(answersToSave).length} answers to Supabase`)
+    
         setSaveStatus('saving')
         try {
           await updateTestAnswers(testId, answersToSave)
-          console.log('🎯 RESUME DEBUG: Successfully auto-saved answers to Supabase')
+      
           setSaveStatus('saved')
           setTimeout(() => setSaveStatus('idle'), 2000)
         } catch (error) {
@@ -250,12 +259,18 @@ export default function PdfPractice() {
 
   // Answer selection handler with debounced auto-save
   const onAnswer = useCallback(async (qid: string, idx: number, correctIdx?: number) => {
-    console.log(`🎯 RESUME DEBUG: Answer selected: ${qid} = ${idx}`)
+
+    
+    // Start session tracking on first answer if not already started
+    if (sessionStartTime === null) {
+      setSessionStartTime(Date.now())
+  
+    }
     
     const newAnswers = { ...answers, [qid]: idx }
     setAnswers(newAnswers)
     
-    console.log(`🎯 RESUME DEBUG: Updated answers object has ${Object.keys(newAnswers).length} answers`)
+
     
     // Trigger debounced save
     debouncedSave(newAnswers)
@@ -263,13 +278,11 @@ export default function PdfPractice() {
     const ok = typeof correctIdx === 'number' ? idx === correctIdx : false
     setFeedback({ ok, id: qid })
     
-    // Play sound effects using existing audio files
+    // Play sound effects using existing audio files with user settings applied
     if (ok) {
-      try { correctAudio.currentTime = 0 } catch { /* ignore */ }
-      correctAudio.play().catch(() => {})
+      playAudio(correctAudio)
     } else {
-      try { wrongAudio.currentTime = 0 } catch { /* ignore */ }
-      wrongAudio.play().catch(() => {})
+      playAudio(wrongAudio)
     }
     
     // Handle streak logic and celebrations
@@ -281,9 +294,9 @@ export default function PdfPractice() {
           setShowStreakMessage(true)
           setShowStudyBuddy(true)
           setShowSuccessCelebration(true)
-          // Play level up sound for streak milestones
+          // Play level up sound for streak milestones with user settings applied
           const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
-          levelUpAudio.play().catch(() => {})
+          playAudio(levelUpAudio)
           setTimeout(() => {
             setShowStreakMessage(false)
             setShowStudyBuddy(false)
@@ -303,7 +316,40 @@ export default function PdfPractice() {
     } else {
       setStreak(0) // Reset streak on wrong answer
     }
-  }, [answers, testId, correctAudio, wrongAudio])
+  }, [answers, testId, correctAudio, wrongAudio, sessionStartTime])
+
+  // Function to save session data
+  const saveSession = useCallback(async () => {
+    if (sessionStartTime === null) return
+    
+    const sessionEndTime = Date.now()
+    const durationSec = Math.round((sessionEndTime - sessionStartTime) / 1000)
+    
+    // Calculate score
+    const correctAnswers = allQuestions.filter(q => answers[q.id] === q.answerIndex).length
+    const totalQuestions = allQuestions.length
+    
+    try {
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+
+      await supabase
+        .from('sessions')
+        .insert({
+          user_id: user.id,
+          date: new Date().toISOString(),
+          section: subject,
+          rawScore: correctAnswers,
+          total: totalQuestions,
+          durationSec: durationSec,
+        })
+      console.log('🎯 Session saved:', { durationSec, correctAnswers, totalQuestions })
+    } catch (error) {
+      console.error('Error saving session:', error)
+    }
+  }, [sessionStartTime, subject, answers, allQuestions])
 
 
 
@@ -381,7 +427,7 @@ export default function PdfPractice() {
       
       getDocument({ data: bytes.buffer }).promise.then(doc => { 
         if (!cancelled) {
-          console.log('PDF loaded successfully, pages:', doc.numPages)
+      
           setPdf(doc) 
           setPdfLoading(false) // PDF loading is complete
         }
@@ -412,7 +458,7 @@ export default function PdfPractice() {
       if (active.sectionPages && active.sectionPages[subject as SectionId]) {
         const storedPage = active.sectionPages[subject as SectionId]
         if (storedPage) {
-          console.log(`Using stored page ${storedPage} for ${subject} section`)
+      
           if (mounted) {
             // Don't override page if we're resuming - the resume logic will set the correct page
             if (!isResume) {
@@ -462,13 +508,8 @@ export default function PdfPractice() {
       // Render PDF
       if (!mounted) return
       
-      const natural = page.getViewport({ scale: 1 })
-      let fitScale = 1
-      if (leftPaneRef.current) {
-        const containerWidth = leftPaneRef.current.clientWidth - 16
-        fitScale = Math.max(1, containerWidth / natural.width)
-      }
-      const viewport = page.getViewport({ scale: fitScale * zoom })
+      // Use zoom directly to allow proper zooming
+      const viewport = page.getViewport({ scale: zoom })
       const canvas = canvasRef.current
       if (!canvas || !mounted) return
       const ctx = canvas.getContext('2d')
@@ -491,8 +532,9 @@ export default function PdfPractice() {
           await renderTask.promise
           
           if (mounted) {
-            canvas.style.width = '100%'
-            canvas.style.height = 'auto'
+            // Don't force canvas to 100% width - let zoom work
+            canvas.style.width = `${viewport.width}px`
+            canvas.style.height = `${viewport.height}px`
           }
         } catch (error) {
           // Ignore cancellation and abort errors - these are expected when navigating quickly
@@ -573,7 +615,7 @@ export default function PdfPractice() {
     setLastManualAdvance(null)
     setStreak(0) // Reset streak when switching sections
     setShowStreakMessage(false) // Hide any existing streak message
-    console.log(`Switched to ${subject} section - cleared previous test data`)
+
   }, [subject, isResume])
 
 
@@ -607,21 +649,21 @@ export default function PdfPractice() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="h-dvh flex flex-col"
+      className="h-screen flex flex-col"
     >
       {/* Background Particles */}
       <SimpleParticles count={15} />
 
       {/* Test Title Bar */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 relative">
           <button 
             className="btn btn-ghost text-white hover:bg-white/20 border-white/20"
             onClick={() => navigate(`/test-selection/${testId}`)}
           >
             ← Back to Subjects
           </button>
-          <div className="text-center flex-1">
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <h1 className="text-3xl font-bold tracking-wide">
               {testConfig ? `${testConfig.name} - ${subject?.toUpperCase()}` : `${subject?.toUpperCase()} TEST`}
             </h1>
@@ -630,12 +672,6 @@ export default function PdfPractice() {
                 `${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.time} — ${testConfig.subjects[subject as keyof typeof testConfig.subjects]?.questions} Questions` :
                 'Loading test configuration...'
               }
-              {/* Debug info */}
-              {testConfig && (
-                <span className="text-xs opacity-50 ml-2">
-                  (Config: {testConfig.id})
-                </span>
-              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -730,7 +766,7 @@ export default function PdfPractice() {
         </div>
       </div>
       
-      <div className="flex-1 grid lg:grid-cols-[2fr_1fr] gap-6 p-4">
+      <div className="flex-1 grid lg:grid-cols-[2fr_1fr] gap-6 p-4 items-center">
         {loading ? (
           <div className="col-span-2 card p-8 text-center">
             <EngagingLoader 
@@ -788,13 +824,13 @@ export default function PdfPractice() {
             <button className="btn btn-ghost" onClick={() => setZoom(z => Math.min(3, parseFloat((z + 0.1).toFixed(2))))}>+</button>
           </div>
         </div>
-        <canvas ref={canvasRef} className="mx-auto w-full" style={{ maxWidth: '100%', height: 'auto' }} />
+        <canvas ref={canvasRef} className="mx-auto" />
         <div className="flex items-center justify-between mt-2 px-2 pb-2">
           <button className="btn btn-ghost" onClick={() => {
             setIsIntentionalPageChange(true)
             setPageNum(p => Math.max(1, p - 1))
-          }}>Prev</button>
-          <button className="btn btn-primary" onClick={() => {
+          }}>Prev Page</button>
+          <button className="btn btn-ghost" onClick={() => {
             if (pdf && pageNum < pdf.numPages) {
               const nextPage = Math.min(pdf.numPages, pageNum + 1)
               console.log(`READING DEBUG: Left pane navigation from page ${pageNum} to page ${nextPage}`)
@@ -889,7 +925,7 @@ export default function PdfPractice() {
             {current && (
               <motion.div
                 key={current.id}
-                className="card p-4 min-h-[85vh]"
+                className="card p-4 flex flex-col"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
@@ -903,10 +939,10 @@ export default function PdfPractice() {
                     </div>
                   )}
                 </div>
-                <div className="font-medium mb-4 mt-1">
+                <div className="font-medium mb-3 mt-1">
                                           {current.prompt}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {current.choices.map((_, i) => {
                     // Determine the state for each choice
                     let state = ''
@@ -952,7 +988,7 @@ export default function PdfPractice() {
                 </div>
 
                 {/* Streak Celebration Message */}
-                <div className="relative h-20">
+                <div className="relative h-16">
                   <AnimatePresence>
                     {showStreakMessage && (
                       <motion.div
@@ -989,7 +1025,7 @@ export default function PdfPractice() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
                       transition={{ duration: 0.3 }}
-                      className="flex justify-center my-4"
+                      className="flex justify-center my-3"
                     >
                       <div className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg ${feedback.ok ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'}`}>
                         {feedback.ok ? '✅ Correct!' : '❌ Incorrect'}
@@ -998,7 +1034,10 @@ export default function PdfPractice() {
                   )}
                 </AnimatePresence>
 
-                <div className="mt-4 flex justify-end gap-2">
+                {/* Spacer to push buttons to bottom */}
+                <div className="flex-1"></div>
+
+                <div className="mt-4 flex justify-between gap-2">
                   <button 
                     className="btn btn-ghost" 
                     onClick={() => {
@@ -1052,10 +1091,9 @@ export default function PdfPractice() {
                           
                           // End test if we've reached the last question
                           if (allAnswered && isLastQuestion) {
-                            console.log(`${subject.toUpperCase()} test completed - reached last question`)
                             // Play level up sound for test completion
                             const levelUpAudio = new Audio('/sounds/level-up-06-370051.mp3')
-                            levelUpAudio.play().catch(() => {})
+                            playAudio(levelUpAudio)
                             setShowCompletionCelebration(true)
                             return i
                           }
@@ -1074,7 +1112,7 @@ export default function PdfPractice() {
                             }
                             
                             if (nextPage <= pdf.numPages) {
-                              console.log(`Manual advance from page ${pageNum} to page ${nextPage}`)
+                          
                               setLastManualAdvance(nextPage)
                               setIsIntentionalPageChange(true) // Mark as intentional page change
                               setPageNum(nextPage)
@@ -1152,8 +1190,9 @@ export default function PdfPractice() {
           setShowCompletionCelebration(false)
           navigate(`/test-selection/${testId}`)
         }}
-        onReview={() => {
+        onReview={async () => {
           setShowCompletionCelebration(false)
+          await saveSession()
           const answersParam = encodeURIComponent(JSON.stringify(answers))
           navigate(`/test-review/${subject}?testId=${testId}&answers=${answersParam}`)
         }}
@@ -1253,8 +1292,9 @@ export default function PdfPractice() {
                 </button>
                 <button
                   className="btn btn-primary flex-1"
-                  onClick={() => {
+                  onClick={async () => {
                     setShowTimeUp(false)
+                    await saveSession()
                     const answersParam = encodeURIComponent(JSON.stringify(answers))
                     navigate(`/test-review/${subject}?testId=${testId}&answers=${answersParam}`)
                   }}

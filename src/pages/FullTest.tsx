@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getActiveTest } from '../lib/testStore'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 type Question = {
   id: string
@@ -13,6 +14,7 @@ type Question = {
 type Section = 'english' | 'math' | 'reading' | 'science'
 
 export default function FullTest() {
+  const { user } = useAuth()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const totalSeconds = Number(params.get('t') ?? 0)
@@ -90,9 +92,16 @@ export default function FullTest() {
   async function finish() {
     // save session to history
     try {
+      if (!user) {
+        console.error('User not authenticated')
+        navigate('/summary', { state: { score, total: totalCount } })
+        return
+      }
+
       await supabase
         .from('sessions')
         .insert({
+          user_id: user.id,
           date: new Date().toISOString(),
           section: 'full',
           rawScore: score,

@@ -58,7 +58,7 @@ export default function Practice() {
   const handleTestSelect = (testId: string) => {
     setSelectedTestId(testId)
     // No need to set active test ID for Supabase system
-    console.log('✅ Selected test:', testId)
+    
   }
 
   const handleStartTest = () => {

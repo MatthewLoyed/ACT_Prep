@@ -1,0 +1,21 @@
+{
+  "name": "TestPrep Pro",
+  "short_name": "TestPrep Pro",
+  "description": "AI-powered ACT® test preparation platform",
+  "icons": [
+    {
+      "src": "/images/yellowBrain.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/yellowBrain.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#667eea",
+  "background_color": "#1a1a1a",
+  "display": "standalone",
+  "start_url": "/"
+}

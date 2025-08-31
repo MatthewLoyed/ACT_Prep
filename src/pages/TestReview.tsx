@@ -12,6 +12,8 @@ import {
   Star
 } from '@phosphor-icons/react'
 import { loadTestFromSupabase } from '../lib/simpleSupabaseStorage'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 type SectionId = 'english' | 'math' | 'reading' | 'science'
 
@@ -26,6 +28,7 @@ type Question = {
 }
 
 export default function TestReview() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { subject = 'english' } = useParams()
   const [params] = useSearchParams()
@@ -70,6 +73,41 @@ export default function TestReview() {
   const correctAnswers = allQuestions.filter(q => answers[q.id] === q.answerIndex).length
   const totalQuestions = allQuestions.length
   const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+
+  // Save session data when page loads (in case user navigated here directly)
+  useEffect(() => {
+    const saveSession = async () => {
+      if (totalQuestions === 0 || Object.keys(answers).length === 0) return
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+      
+      try {
+        // Estimate session duration (since we don't have exact start time)
+        // Assume average of 2 minutes per question as a reasonable estimate
+        const estimatedDurationSec = Math.round(totalQuestions * 2 * 60)
+        
+        await supabase
+          .from('sessions')
+          .insert({
+            user_id: user.id,
+            date: new Date().toISOString(),
+            section: subject,
+            rawScore: correctAnswers,
+            total: totalQuestions,
+            durationSec: estimatedDurationSec,
+          })
+        console.log('🎯 Session saved from TestReview:', { estimatedDurationSec, correctAnswers, totalQuestions })
+      } catch (error) {
+        console.error('Error saving session from TestReview:', error)
+      }
+    }
+    
+    if (!loading) {
+      saveSession()
+    }
+  }, [loading, subject, correctAnswers, totalQuestions, answers, user])
 
   const getScoreIcon = () => {
     if (percentage >= 90) return <Trophy className="w-8 h-8 text-yellow-500" weight="fill" />

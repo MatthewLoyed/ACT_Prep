@@ -143,14 +143,15 @@ export default function TestCompletionCelebration({
             </motion.div>
 
             {/* Completion Message */}
-            <motion.h1
+            <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.5 }}
-              className="text-3xl font-bold text-white mb-2"
+              className="flex items-center justify-center gap-3 mb-2"
             >
-              Test Complete! 🎉
-            </motion.h1>
+              <div className="text-3xl font-bold text-white">Test Complete!</div>
+              <div className="text-3xl">🎉</div>
+            </motion.div>
 
             <motion.p
               initial={{ y: 20, opacity: 0 }}
@@ -191,9 +192,6 @@ export default function TestCompletionCelebration({
 
             {/* Action Buttons */}
             {showActions && (
-              <div className="text-white text-xs mb-2">Debug: Buttons should be visible</div>
-            )}
-            {showActions && (
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -202,10 +200,9 @@ export default function TestCompletionCelebration({
               >
                 <button
                   onClick={() => {
-                    console.log('Review button clicked')
                     onReview()
                   }}
-                                     className="w-full bg-gradient-to-r from-yellow-300 to-yellow-500 text-gray-800 font-bold py-3 px-6 rounded-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full btn btn-primary flex items-center justify-center gap-2"
                 >
                   <Play weight="fill" />
                   Review Test
@@ -213,13 +210,12 @@ export default function TestCompletionCelebration({
                 
                 <button
                   onClick={() => {
-                    console.log('Continue button clicked')
                     onComplete()
                   }}
                   className="w-full bg-white/20 text-white font-semibold py-3 px-6 rounded-xl hover:bg-white/30 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ArrowRight weight="bold" />
-                  Continue
+                  Continue Practicing
                 </button>
               </motion.div>
             )}

@@ -9,7 +9,7 @@ interface TextTypeProps {
   className?: string;
   showCursor?: boolean;
   hideCursorWhileTyping?: boolean;
-  cursorCharacter?: string | React.ReactNode;
+  cursorCharacter?: string | React.ReactElement;
   cursorBlinkDuration?: number;
   cursorClassName?: string;
   text: string | string[];

@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import BlurText from '../components/BlurText'
 import TextType from '../components/TextType'
 import FunWordAnimation from '../components/FunWordAnimation'
+import { useAuth } from '../contexts/AuthContext'
+import LoginModal from '../components/LoginModal'
+import SignupModal from '../components/SignupModal'
+import InteractiveDemo from '../components/InteractiveDemo'
+import { listTestsFromSupabase } from '../lib/simpleSupabaseStorage'
 
 
 const features = [
@@ -17,13 +22,63 @@ const features = [
 
 const faqs = [
   { q: 'Is this free?', a: 'Yes. Your practice data stays in your browser.' },
-  { q: 'Where do questions come from?', a: 'Sampled from recent ACT®-style practice material (JSON for now, API-ready later).' },
+  { q: 'Where do questions come from?', a: 'Questions are extracted directly from your uploaded ACT® test PDFs. We parse real test content to create authentic practice questions.' },
   { q: 'Can I practice on my phone?', a: 'Absolutely. The UI is fully responsive.' },
+  { q: 'Why do I need to upload my own test?', a: 'Due to copyright restrictions, we cannot host official ACT® tests. You upload your own test PDFs to practice with authentic questions.' },
 ]
 
 export default function Landing() {
+  const { user } = useAuth()
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false)
+  const [hasTests, setHasTests] = useState(false)
+  const [isLoadingTests, setIsLoadingTests] = useState(false)
+
+  // Check if user has tests when they're signed in
+  useEffect(() => {
+    if (user) {
+      setIsLoadingTests(true)
+      listTestsFromSupabase()
+        .then((tests) => {
+          setHasTests(tests.length > 0)
+        })
+        .catch((error) => {
+          console.error('Error loading tests:', error)
+          setHasTests(false)
+        })
+        .finally(() => {
+          setIsLoadingTests(false)
+        })
+    } else {
+      setHasTests(false)
+    }
+  }, [user])
+  
   return (
     <div className="py-16 relative overflow-hidden">
+      {/* Logo and title for non-authenticated users */}
+      {!user && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="fixed top-4 left-4 z-50"
+        >
+          <Link to="/" className="group flex items-center gap-3">
+            <img 
+              src="/images/yellowBrain.png" 
+              alt="Brain Logo" 
+              className="w-12 h-12 group-hover:scale-110 transition-transform duration-200"
+              style={{
+                filter: 'var(--logo-filter, hue-rotate(0deg) saturate(0.8) brightness(1.1))'
+              }}
+            />
+            <span className="text-2xl font-bold text-white text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200">
+              TestPrep Pro
+            </span>
+          </Link>
+        </motion.div>
+      )}
       {/* Dynamic Floating Brains */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(30)].map((_, i) => {
@@ -69,8 +124,8 @@ export default function Landing() {
       </div>
 
       {/* Hero */}
-      <div className="container grid place-items-center relative z-10">
-        <div className="max-w-4xl text-center backdrop-blur-md">
+      <div className="w-full px-2 relative z-10">
+        <div className="w-full text-center backdrop-blur-md">
           <div className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl mb-6">
             ACT® Prep that is{' '}
             <FunWordAnimation className="text-5xl md:text-7xl font-extrabold tracking-tight text-high-contrast-bold text-shadow-xl" />
@@ -90,40 +145,118 @@ export default function Landing() {
             textColors={["#E2E8F0"]}
           />
           <motion.div 
-            className="mt-10 flex items-center justify-center gap-4" 
+            className="mt-10 flex items-center justify-center gap-4 flex-wrap" 
             initial={{ opacity: 0, y: 20 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            <Link to="/import">
-              <motion.div
-                className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                animate={{
-                  boxShadow: [
-                    '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
-                    '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
-                    '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
-                  ],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              >
-                Click Here To Get Started!
-              </motion.div>
-            </Link>
+            {user ? (
+              // User is signed in - show action buttons
+              <>
+                <Link to="/import">
+                  <motion.div
+                    className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                    animate={{
+                      boxShadow: [
+                        '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
+                        '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
+                        '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
+                      ],
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    {isLoadingTests ? '🔄 Loading...' : hasTests ? '📄 Import Another Test' : '🚀 Import Your First Test!'}
+                  </motion.div>
+                </Link>
+                <Link to="/practice">
+                  <motion.div
+                    className="btn btn-ghost text-lg px-6 py-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    📚 View My Tests
+                  </motion.div>
+                </Link>
+              </>
+            ) : (
+              // User is not signed in - show sign up/sign in buttons
+              <>
+                <motion.button
+                  onClick={() => setIsSignupModalOpen(true)}
+                  className="btn btn-primary text-lg px-8 py-4 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  animate={{
+                    boxShadow: [
+                      '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
+                      '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
+                      '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
+                    ],
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  🎯 Start Practicing Free!
+                </motion.button>
+                <motion.button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="btn btn-ghost text-lg px-8 py-4 border-2 border-white/30 hover:bg-white/20 transition-all duration-200"
+                >
+                  🔑 Already have an account?
+                </motion.button>
+              </>
+            )}
             <a href="#features" className="btn btn-ghost text-lg px-6 py-3 hover:bg-slate-100 dark:hover:bg-slate-800">
               See features
             </a>
           </motion.div>
+          
+          {/* Add a small note for non-signed in users */}
+          {!user && (
+            <motion.p 
+              className="mt-4 text-sm text-white/70"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              ✨ Sign up in 30 seconds • No credit card required • Start practicing immediately
+            </motion.p>
+          )}
         </div>
       </div>
 
+      {/* Interactive Demo Section */}
+      {!user && (
+        <div className="w-full px-2 mt-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-4xl font-bold mb-6 text-high-contrast-bold text-shadow-lg">
+              Get Started in 3 Quick Steps
+            </h2>
+            <p className="text-xl text-secondary max-w-6xl mx-auto">
+              See how easy it is to transform your ACT® prep with our interactive demo
+            </p>
+          </motion.div>
+          
+          <InteractiveDemo
+            onSignupClick={() => setIsSignupModalOpen(true)}
+            onLoginClick={() => setIsLoginModalOpen(true)}
+          />
+        </div>
+      )}
+
       {/* Features */}
-      <div id="features" className="container mt-20">
+      <div id="features" className="w-full px-2 mt-20">
         <motion.h2 
           className="text-3xl font-bold text-center mb-12 text-high-contrast-bold text-shadow-lg"
           initial={{ opacity: 0, y: 20 }}
@@ -158,7 +291,7 @@ export default function Landing() {
       </div>
 
       {/* Why better */}
-      <div className="container mt-20">
+      <div className="w-full px-2 mt-20">
         <motion.div 
           className="card p-8"
           initial={{ opacity: 0, y: 20 }}
@@ -167,18 +300,9 @@ export default function Landing() {
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-8">
-            <motion.div 
-              className="text-4xl mb-4"
-              initial={{ scale: 0, rotate: -180 }}
-              whileInView={{ scale: 1, rotate: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, type: "spring" }}
-            >
-              🚀
-            </motion.div>
             <BlurText
-              text="Why This Beats Traditional Test Prep"
-              className="text-3xl font-bold text-high-contrast-bold text-shadow-lg"
+              text="🚀 Why This Beats Traditional Test Prep"
+              className="text-3xl font-bold text-high-contrast-bold text-shadow-lg justify-center"
               delay={50}
               animateBy="words"
               direction="top"
@@ -199,15 +323,16 @@ export default function Landing() {
                   initial={{ scale: 0, rotate: -180 }}
                   whileInView={{ scale: 1, rotate: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+                  transition={{ duration: 0.6, type: "spring" }}
                 >
                   ⚡
                 </motion.div>
                 <div>
-                  <h4 className="font-semibold text-lg">Quick Wins</h4>
-                  <p className="text-secondary">Chunk your practice into bite-sized sessions instead of exhausting marathons.</p>
+                  <h3 className="font-bold text-xl mb-2">Instant Feedback</h3>
+                  <p className="text-secondary">No more waiting to check answers. Get immediate feedback with sound effects and animations that make learning stick.</p>
                 </div>
               </motion.div>
+              
               <motion.div 
                 className="flex items-start gap-3"
                 initial={{ opacity: 0, x: -20 }}
@@ -220,57 +345,103 @@ export default function Landing() {
                   initial={{ scale: 0, rotate: -180 }}
                   whileInView={{ scale: 1, rotate: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: 0.3, duration: 0.6, type: "spring" }}
+                  transition={{ duration: 0.6, type: "spring" }}
                 >
                   🎯
                 </motion.div>
                 <div>
-                  <h4 className="font-semibold text-lg">Instant Feedback</h4>
-                  <p className="text-secondary">Learn from mistakes immediately and stay motivated with real-time results.</p>
+                  <h3 className="font-bold text-xl mb-2">Real ACT® Questions</h3>
+                  <p className="text-secondary">Practice with authentic ACT®-style questions that mirror the actual test format and difficulty.</p>
+                </div>
+              </motion.div>
+              
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, type: "spring" }}
+                >
+                  📊
+                </motion.div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2">Progress Tracking</h3>
+                  <p className="text-secondary">Watch your improvement with detailed analytics and progress tracking across all ACT® sections.</p>
                 </div>
               </motion.div>
             </div>
+            
             <div className="space-y-4">
               <motion.div 
                 className="flex items-start gap-3"
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
-                transition={{ delay: 0.1, duration: 0.5 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
               >
                 <motion.div 
                   className="text-2xl"
                   initial={{ scale: 0, rotate: -180 }}
                   whileInView={{ scale: 1, rotate: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+                  transition={{ duration: 0.6, type: "spring" }}
                 >
-                  ✨
+                  🎮
                 </motion.div>
                 <div>
-                  <h4 className="font-semibold text-lg">Engaging Experience</h4>
-                  <p className="text-secondary">Smooth animations and sounds make learning feel rewarding, not stressful.</p>
+                  <h3 className="font-bold text-xl mb-2">Gamified Learning</h3>
+                  <p className="text-secondary">Turn boring test prep into an engaging experience with achievements, animations, and interactive elements.</p>
                 </div>
               </motion.div>
+              
               <motion.div 
                 className="flex items-start gap-3"
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
               >
                 <motion.div 
                   className="text-2xl"
                   initial={{ scale: 0, rotate: -180 }}
                   whileInView={{ scale: 1, rotate: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: 0.3, duration: 0.6, type: "spring" }}
+                  transition={{ duration: 0.6, type: "spring" }}
                 >
-                  🎨
+                  📱
                 </motion.div>
                 <div>
-                  <h4 className="font-semibold text-lg">Distraction-Free</h4>
-                  <p className="text-secondary">Clean design with light/dark themes helps you focus on what matters.</p>
+                  <h3 className="font-bold text-xl mb-2">Mobile Friendly</h3>
+                  <p className="text-secondary">Practice anywhere, anytime. Our responsive design works perfectly on phones, tablets, and desktops.</p>
+                </div>
+              </motion.div>
+              
+              <motion.div 
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="text-2xl"
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, type: "spring" }}
+                >
+                  🔒
+                </motion.div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2">Your Data, Your Privacy</h3>
+                  <p className="text-secondary">Your practice data is private and secure. No sharing, no ads, just focused learning.</p>
                 </div>
               </motion.div>
             </div>
@@ -278,50 +449,96 @@ export default function Landing() {
         </motion.div>
       </div>
 
-      {/* FAQs */}
-      <div className="container mt-16">
-        <h3 className="text-2xl font-semibold mb-4">FAQs</h3>
-        <div className="space-y-3">
-          {faqs.map((f, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ delay: i * 0.05 }} className="card">
-              <Accordion title={f.q}>{f.a}</Accordion>
+      {/* FAQ Section */}
+      <div className="w-full px-0 mt-20">
+        <motion.h2 
+          className="text-3xl font-bold text-center mb-12 text-high-contrast-bold text-shadow-lg"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          Frequently Asked Questions
+        </motion.h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {faqs.map((faq, i) => (
+            <motion.div 
+              key={faq.q} 
+              initial={{ opacity: 0, y: 20 }} 
+              whileInView={{ opacity: 1, y: 0 }} 
+              viewport={{ once: true, amount: 0.3 }} 
+              transition={{ delay: i * 0.1, duration: 0.5 }} 
+              className="card p-6 hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="font-bold text-xl mb-3 text-high-contrast-bold">{faq.q}</h3>
+              <p className="text-secondary leading-relaxed">{faq.a}</p>
             </motion.div>
           ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="mt-16 border-t border-slate-200 dark:border-slate-800">
-                  <div className="container py-6 text-sm text-secondary flex items-center justify-between">
-          <div>© 2025 TestPrep Pro — All rights reserved.</div>
-          <div className="opacity-80">Made with React, Tailwind CSS, and Framer Motion.</div>
+      {/* Final CTA */}
+      {!user && (
+        <div className="w-full px-2 mt-20">
+          <motion.div 
+            className="text-center"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-4xl font-bold mb-6 text-high-contrast-bold text-shadow-lg">
+              Ready to Ace Your ACT®?
+            </h2>
+            <p className="text-xl text-secondary mb-8 max-w-6xl mx-auto">
+              Join thousands of students who've transformed their test prep experience. 
+              Start practicing today and see the difference engaging, interactive learning makes.
+            </p>
+            <motion.button
+              onClick={() => setIsSignupModalOpen(true)}
+              className="btn btn-primary text-xl px-10 py-5 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 inline-block"
+              animate={{
+                boxShadow: [
+                  '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)',
+                  '0 0 50px rgba(255, 234, 167, 0.9), 0 0 100px rgba(102, 126, 234, 0.8)',
+                  '0 0 30px rgba(255, 234, 167, 0.6), 0 0 60px rgba(102, 126, 234, 0.5)'
+                ],
+                scale: [1, 1.05, 1]
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              🎯 Start Your Free Practice Now!
+            </motion.button>
+          </motion.div>
         </div>
-      </footer>
+      )}
+
+      {/* Auth Modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false)
+          setIsSignupModalOpen(true)
+        }}
+      />
+      
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => setIsSignupModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false)
+          setIsLoginModalOpen(true)
+        }}
+      />
     </div>
   )
 }
 
-function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="px-4 py-3">
-      <button
-        className="w-full text-left py-1 text-lg font-medium flex items-center justify-between"
-        onClick={() => setOpen(o => !o)}
-      >
-        <span>{title}</span>
-        <span className={`transition-transform ${open ? 'rotate-180' : ''}`}>⌄</span>
-      </button>
-      <motion.div
-        initial={false}
-        animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }}
-        transition={{ duration: 0.25 }}
-        className="overflow-hidden"
-      >
-        <p className="mt-2 text-secondary">{children}</p>
-      </motion.div>
-    </div>
-  )
-}
+
 
 

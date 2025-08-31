@@ -7,22 +7,28 @@ import {
 } from '@phosphor-icons/react'
 import ColorSchemeSwitcher from '../components/ColorSchemeSwitcher'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+
 
 export default function Settings() {
+  const { user } = useAuth()
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState(50)
+  const [tempVolume, setTempVolume] = useState(50) // Temporary volume during dragging
   const [isSaving, setIsSaving] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  
+
 
 
   // Load settings from Supabase on component mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        console.log('🔧 Loading settings from Supabase...')
         const { data, error } = await supabase
           .from('user_preferences')
           .select('sound_muted, sound_volume')
+          .eq('user_id', user?.id) // Only load settings for current user
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
@@ -32,19 +38,14 @@ export default function Settings() {
           return
         }
         
-        console.log('🔧 Loaded settings from Supabase:', data)
-        
         if (data) {
           if (data.sound_muted !== null) {
-            console.log('🔧 Setting muted to:', data.sound_muted)
             setIsMuted(data.sound_muted)
           }
           if (data.sound_volume !== null) {
-            console.log('🔧 Setting volume to:', data.sound_volume)
             setVolume(data.sound_volume)
+            setTempVolume(data.sound_volume) // Initialize temp volume
           }
-        } else {
-          console.log('🔧 No settings found in Supabase, using defaults')
         }
       } catch (error) {
         console.error('Error loading settings:', error)
@@ -61,12 +62,12 @@ export default function Settings() {
     if (!isLoaded) return // Don't save until we've loaded initial settings
     
     const saveSettings = async () => {
-      console.log('🔧 Saving settings to Supabase:', { isMuted, volume })
       setIsSaving(true)
       try {
         const { error } = await supabase
           .from('user_preferences')
           .upsert({ 
+            user_id: user?.id, // Associate with the current user
             sound_muted: isMuted,
             sound_volume: volume,
             created_at: new Date().toISOString()
@@ -74,8 +75,6 @@ export default function Settings() {
         
         if (error) {
           console.error('Error saving settings:', error)
-        } else {
-          console.log('🔧 Settings saved successfully')
         }
       } catch (error) {
         console.error('Error saving settings:', error)
@@ -85,14 +84,31 @@ export default function Settings() {
     }
     
     saveSettings()
-  }, [isMuted, volume, isLoaded])
+  }, [isMuted, volume, isLoaded, user?.id])
 
   const handleVolumeChange = (newVolume: number) => {
+    setTempVolume(newVolume) // Only update temp volume during dragging
+    if (newVolume === 0) {
+      setIsMuted(true)
+    } else if (isMuted) {
+      setIsMuted(false)
+    }
+  }
+
+  const handleVolumeChangeEnd = (newVolume: number) => {
     setVolume(newVolume)
     if (newVolume === 0) {
       setIsMuted(true)
     } else if (isMuted) {
       setIsMuted(false)
+    }
+    
+    // Play sound feedback only when user releases the slider (like Windows)
+    if (newVolume > 0 && !isMuted) {
+      const testAudio = new Audio('/sounds/correct_answer.mp3')
+      testAudio.volume = newVolume / 100
+      testAudio.currentTime = 0
+      testAudio.play().catch(() => {})
     }
   }
 
@@ -107,15 +123,15 @@ export default function Settings() {
   }
 
   const getVolumeColor = () => {
-    if (isMuted || volume === 0) return 'text-red-400'
-    if (volume < 50) return 'text-yellow-400'
+    if (isMuted || tempVolume === 0) return 'text-red-400'
+    if (tempVolume < 50) return 'text-yellow-400'
     return 'text-green-400'
   }
 
   const getVolumeBorderColor = () => {
-    if (isMuted || volume === 0) return 'border-red-400'
-    if (volume < 30) return 'border-yellow-400'
-    if (volume < 70) return 'border-orange-400'
+    if (isMuted || tempVolume === 0) return 'border-red-400'
+    if (tempVolume < 30) return 'border-yellow-400'
+    if (tempVolume < 70) return 'border-orange-400'
     return 'border-green-400'
   }
 
@@ -140,6 +156,29 @@ export default function Settings() {
 
         {/* Settings Cards */}
         <div className="space-y-6">
+          {/* User Info */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white">Account Info</h2>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-white/90 text-lg">Email:</span>
+                <span className="text-white font-semibold">{user?.email || 'Not signed in'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/90 text-lg">Provider:</span>
+                <span className="text-white font-semibold">{user?.app_metadata?.provider || 'N/A'}</span>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Sound Settings */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -181,7 +220,7 @@ export default function Settings() {
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Volume</span>
                   <span className={`font-bold ${getVolumeColor()}`}>
-                    {isMuted ? 'Muted' : `${volume}%`}
+                    {isMuted ? 'Muted' : `${tempVolume}%`}
                   </span>
                 </div>
                 <div className="relative">
@@ -189,37 +228,19 @@ export default function Settings() {
                     type="range"
                     min="0"
                     max="100"
-                    value={isMuted ? 0 : volume}
+                    value={isMuted ? 0 : tempVolume}
                     onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                    onMouseUp={(e) => handleVolumeChangeEnd(parseInt(e.currentTarget.value))}
+                    onTouchEnd={(e) => handleVolumeChangeEnd(parseInt(e.currentTarget.value))}
                     className="w-full h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
                     style={{
-                      background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) ${isMuted ? 0 : volume}%, rgba(255,255,255,0.2) 100%)`
+                      background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${isMuted ? 0 : tempVolume}%, rgba(255,255,255,0.2) ${isMuted ? 0 : tempVolume}%, rgba(255,255,255,0.2) 100%)`
                     }}
                   />
                 </div>
               </div>
 
-              {/* Volume Presets */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleVolumeChange(25)}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-                >
-                  Low
-                </button>
-                <button
-                  onClick={() => handleVolumeChange(50)}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-                >
-                  Medium
-                </button>
-                <button
-                  onClick={() => handleVolumeChange(75)}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-                >
-                  High
-                </button>
-              </div>
+              
             </div>
           </motion.div>
 
@@ -247,29 +268,7 @@ export default function Settings() {
             </div>
           </motion.div>
 
-          {/* Test Sound Button */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="text-center"
-          >
-            <button
-              onClick={() => {
-                if (!isMuted && volume > 0) {
-                  // Play test sound using existing audio files
-                  const testAudio = new Audio('/sounds/correct_answer.mp3')
-                  testAudio.volume = volume / 100
-                  testAudio.play().catch(() => {})
-                }
-              }}
-              disabled={isMuted || volume === 0}
-              className="text-[var(--color-text-dark)] font-bold py-3 px-8 rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{ background: 'linear-gradient(45deg, var(--color-accent), var(--color-accent-dark))' }}
-            >
-              Test Sound
-            </button>
-          </motion.div>
+                                           
         </div>
       </motion.div>
     </div>

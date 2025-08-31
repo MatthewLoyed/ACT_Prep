@@ -10,6 +10,7 @@ import {
   cleanDuplicateAchievements
 } from '../lib/achievements'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 type SectionKey = 'english' | 'math' | 'reading' | 'science'
 
@@ -29,10 +30,14 @@ type Test = {
 }
 
 export default function History() {
+  const { user } = useAuth()
   const [goal, setGoal] = useState<number>(28)
+  const [currentActScore, setCurrentActScore] = useState<number | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [tests, setTests] = useState<Test[]>([])
   const [loading, setLoading] = useState(true)
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [achievementProgress, setAchievementProgress] = useState<{
     earned: any[]
     available: any[]
@@ -41,31 +46,53 @@ export default function History() {
   }>({ earned: [], available: [], total: 0, earnedCount: 0 })
 
   useEffect(() => {
-    loadData()
-    // Clean up any duplicate achievements on load
-    cleanDuplicateAchievements().catch(console.error)
-  }, [])
+    if (user && !dataLoaded) {
+      setDataLoaded(true)
+      loadData()
+      // Clean up any duplicate achievements on load
+      cleanDuplicateAchievements().catch(console.error)
+    } else if (!user) {
+      setLoading(false)
+    }
+  }, [user, dataLoaded])
 
   const loadData = async () => {
     try {
-      // Load goal from Supabase - get the most recent row
-      const { data: goalData, error: goalError } = await supabase
+      // Load goal and current ACT score from Supabase - get the most recent row for current user
+      const { data: preferencesData, error: preferencesError } = await supabase
         .from('user_preferences')
-        .select('goal_score')
+        .select('goal_score, current_act_score')
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
       
-      if (goalError) {
-        console.error('Error loading goal:', goalError)
-      } else if (goalData?.goal_score) {
-        setGoal(goalData.goal_score)
+      if (preferencesError) {
+        console.error('❌ Error loading preferences:', preferencesError)
+      } else if (preferencesData) {
+        if (preferencesData.goal_score) {
+          setGoal(preferencesData.goal_score)
+        }
+        if (preferencesData.current_act_score !== null && preferencesData.current_act_score !== undefined) {
+          setCurrentActScore(preferencesData.current_act_score)
+          // setShowActScoreModal(false) // ARCHIVED - Modal is disabled
+        } else {
+          // Show ACT score modal if no current score is set
+          // setShowActScoreModal(true) // ARCHIVED - Modal is disabled
+        }
+      } else {
+        // No preferences found, show ACT score modal
+        // setShowActScoreModal(true) // ARCHIVED - Modal is disabled
       }
+      
+              // Mark preferences as loaded
+        setPreferencesLoaded(true)
       
       // Load sessions from Supabase
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
         .select('*')
+        .eq('user_id', user?.id)
         .order('date', { ascending: false })
       
       if (sessionsError) {
@@ -99,18 +126,29 @@ export default function History() {
 
 
 
+
+
   const updateGoal = async (newGoal: number) => {
     try {
+      // Check if user is authenticated
+      if (!user) {
+        console.error('❌ User not authenticated')
+        return
+      }
+
       setGoal(newGoal)
+      
+      // Use upsert like Settings page does
       const { error } = await supabase
         .from('user_preferences')
         .upsert({ 
+          user_id: user.id,
           goal_score: newGoal,
           created_at: new Date().toISOString()
         })
       
       if (error) {
-        console.error('Error updating goal:', error)
+        console.error('❌ Error updating goal:', error)
       }
     } catch (error) {
       console.error('Error updating goal:', error)
@@ -214,14 +252,10 @@ export default function History() {
     const checkForNewAchievements = async () => {
       if (!loading) {
         try {
-          const newAchievements = await checkAchievements(userStats)
-          if (newAchievements.length > 0) {
-            await addNewAchievements(newAchievements)
-            console.log('🎉 New achievements earned:', newAchievements.map(a => a.title))
-          }
-          
-          // Debug: Log current achievements
-          console.log('📊 Current achievements:', achievementProgress.earned.map(a => ({ id: a.id, title: a.title, earnedAt: a.earnedAt })))
+                  const newAchievements = await checkAchievements(userStats)
+        if (newAchievements.length > 0) {
+          await addNewAchievements(newAchievements)
+        }
         } catch (error) {
           console.error('Error checking achievements:', error)
         }
@@ -230,6 +264,41 @@ export default function History() {
     
     checkForNewAchievements()
   }, [loading, userStats]) // Run when loading changes or userStats changes
+
+
+
+  // Show loading state while checking authentication or loading preferences
+  if (loading || !preferencesLoaded) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="card p-8 text-center">
+          <div className="text-2xl mb-4">⏳</div>
+          <p className="text-secondary">Loading your progress...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login prompt if user is not authenticated
+  if (!user) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="card p-8 text-center">
+          <div className="text-4xl mb-4">🔐</div>
+          <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
+          <p className="text-secondary mb-6">
+            Please sign in to view your progress and history.
+          </p>
+          <button 
+            onClick={() => window.location.href = '/login'}
+            className="btn btn-primary"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <motion.div 
@@ -243,8 +312,12 @@ export default function History() {
 
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="card p-5">
-                <div className="text-sm text-secondary">Overall ACT® (est.)</div>
-                <div className="text-4xl font-bold">{overallAct} / 36</div>
+                <div className="text-sm text-secondary">
+                  {currentActScore ? 'Current ACT® Score' : 'Overall ACT® (est.)'}
+                </div>
+                <div className="text-4xl font-bold">
+                  {currentActScore || overallAct} / 36
+                </div>
               </div>
               <div className="card p-5">
                 <div className="text-sm text-secondary">Questions practiced</div>
@@ -368,9 +441,11 @@ export default function History() {
         </div>
         <div className="mt-3">
           <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800/70 overflow-hidden">
-            <div className="h-full brand-gradient" style={{ width: `${Math.min(100, (overallAct / goal) * 100)}%` }} />
+            <div className="h-full brand-gradient" style={{ width: `${Math.min(100, ((currentActScore || overallAct) / goal) * 100)}%` }} />
           </div>
-                      <div className="mt-1 text-sm text-secondary">Estimated ACT® vs goal</div>
+                      <div className="mt-1 text-sm text-secondary">
+                        {currentActScore ? 'Current ACT® vs goal' : 'Estimated ACT® vs goal'}
+                      </div>
         </div>
       </div>
 
@@ -440,6 +515,72 @@ export default function History() {
           ))}
         </div>
       </div>
+
+      {/* ACT Score Input Modal - ARCHIVED */}
+      {/* 
+      {(() => {
+        const modalShouldShow = showActScoreModal && preferencesLoaded && currentActScore === null
+        console.log('🎯 Modal condition evaluation:', { 
+          showActScoreModal, 
+          preferencesLoaded, 
+          currentActScore, 
+          modalShouldShow 
+        })
+        return modalShouldShow
+      })() && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 grid place-items-center bg-black/60 z-50"
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, y: 10, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            className="card p-8 text-center max-w-md mx-4"
+          >
+            <div className="text-4xl mb-4">🎯</div>
+            <h2 className="text-2xl font-bold mb-4">What's Your Current ACT® Score?</h2>
+            <p className="text-secondary mb-6">
+              We need your current ACT® score to track your progress and provide personalized insights.
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Your ACT® Score (1-36)</label>
+              <input
+                type="number"
+                min="1"
+                max="36"
+                value={actScoreInput}
+                onChange={(e) => setActScoreInput(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-bold outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900"
+                placeholder="Enter score"
+                autoFocus
+              />
+            </div>
+            
+            <button
+              onClick={() => {
+                const score = parseInt(actScoreInput)
+                if (score >= 1 && score <= 36) {
+                  saveActScore(score)
+                }
+              }}
+              disabled={!actScoreInput || parseInt(actScoreInput) < 1 || parseInt(actScoreInput) > 36}
+              className="btn btn-primary w-full py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save Score
+            </button>
+            
+            <p className="text-xs text-secondary mt-4">
+              You can update this later in your settings.
+            </p>
+          </motion.div>
+        </motion.div>
+      )}
+      */}
     </motion.div>
   )
 }

@@ -27,6 +27,12 @@ export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'crea
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('User must be authenticated to save tests')
+  }
+  
   const fullTestData: SimpleTestData = {
     id,
     name: testData.name,
@@ -47,11 +53,13 @@ export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'crea
   
   console.log('💾 Saving test to Supabase:', testData.name)
   console.log('💾 PDF data length:', fullTestData.pdfData.length)
+  console.log('💾 User ID:', user.id)
   
   const { error } = await supabase
     .from('tests')
     .insert({
       id: fullTestData.id,
+      user_id: user.id, // 🔑 Add user_id for data isolation
       name: fullTestData.name,
       created_at: fullTestData.createdAt,
       pdf_data: fullTestData.pdfData,
@@ -73,7 +81,6 @@ export async function saveTestToSupabase(testData: Omit<TestBundle, 'id' | 'crea
 
 // Load a test from Supabase
 export async function loadTestFromSupabase(id: string): Promise<SimpleTestData | null> {
-  console.log('🔍 Loading test from Supabase:', id)
   
   const { data, error } = await supabase
     .from('tests')
@@ -109,14 +116,11 @@ export async function loadTestFromSupabase(id: string): Promise<SimpleTestData |
     }
   }
   
-  console.log('✅ Test loaded from Supabase:', testData.name)
   return testData
 }
 
 // List all tests from Supabase
 export async function listTestsFromSupabase(): Promise<Array<{ id: string; name: string; createdAt: string; hasProgress: boolean }>> {
-  console.log('📋 Listing tests from Supabase...')
-  
   const { data, error } = await supabase
     .from('tests')
     .select('id, name, created_at, answers, progress')
@@ -134,13 +138,11 @@ export async function listTestsFromSupabase(): Promise<Array<{ id: string; name:
     hasProgress: Object.keys(test.answers || {}).length > 0 || test.progress?.isCompleted
   }))
   
-  console.log(`📋 Found ${tests.length} tests in Supabase`)
   return tests
 }
 
 // Update answers for a test
 export async function updateTestAnswers(id: string, answers: Record<string, number>): Promise<void> {
-  console.log('📝 Updating answers in Supabase:', id)
   
   const { error } = await supabase
     .from('tests')
@@ -156,8 +158,6 @@ export async function updateTestAnswers(id: string, answers: Record<string, numb
     console.error('❌ Error updating answers in Supabase:', error)
     throw new Error(`Failed to update answers: ${error.message}`)
   }
-  
-  console.log('✅ Answers updated in Supabase successfully')
 }
 
 // Update progress for a test

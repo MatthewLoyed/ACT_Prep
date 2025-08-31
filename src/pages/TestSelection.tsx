@@ -123,8 +123,8 @@ export default function TestSelection() {
     }
     
     if (subjectId === 'full') {
-      // Navigate to full test setup
-      navigate(`/full-test-setup?testId=${testId}`)
+      // Full test coming soon
+      alert('Full test feature coming soon! This will allow you to take a complete ACT® test with all sections.')
       return
     }
     
@@ -209,7 +209,7 @@ export default function TestSelection() {
                 onClick={() => handleSubjectSelect(s.id)}
                 disabled={!isAvailable}
               >
-                <div className={`card overflow-hidden transition-all duration-300 ${isAvailable ? 'hover:shadow-xl group-hover:-translate-y-2 hover:scale-105' : ''}`}>
+                                 <div className={`card overflow-hidden transition-all duration-300 ${isAvailable ? 'hover:shadow-xl group-hover:-translate-y-2 hover:scale-105' : 'cursor-not-allowed'}`}>
                   <div className={`h-32 bg-gradient-to-br ${s.color} relative overflow-hidden flex items-center justify-center`}>
                     <s.icon className="w-12 h-12 text-white" weight="fill" />
                     {s.id === 'science' && !test.sections?.science && (
@@ -283,56 +283,52 @@ export default function TestSelection() {
         })}
       </div>
       
-      {/* Full Test Option - Spans 2 columns */}
-      <div className="mt-8">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="col-span-2"
-        >
-          <button 
-            className="block group w-full cursor-pointer"
-            onClick={() => handleSubjectSelect(fullTestOption.id)}
-          >
-                            <div className="card overflow-hidden transition-all duration-300 hover:shadow-xl group-hover:-translate-y-2 hover:scale-105 border-2 border-cyan-200 dark:border-cyan-800">
-              <div className={`h-40 bg-gradient-to-br ${fullTestOption.color} relative overflow-hidden flex items-center justify-center`}>
-                <fullTestOption.icon className="w-20 h-20 text-white" weight="fill" />
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-white" />
-                <div className="absolute top-4 right-4">
-                  <span className="inline-block rounded-full bg-white/20 text-white px-3 py-1 text-sm font-semibold">
-                    Complete Test
-                  </span>
-                </div>
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold">{fullTestOption.title}</h3>
-                    <p className="text-lg text-slate-600 dark:text-slate-400">
-                      {fullTestOption.time} • {fullTestOption.questions}
-                    </p>
-                  </div>
-                  <span className="opacity-0 group-hover:opacity-100 transition-all translate-x-0 group-hover:translate-x-2 text-3xl">→</span>
-                </div>
-                <p className="text-slate-700 dark:text-slate-300 text-lg">{fullTestOption.blurb}</p>
-                
-                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-                  <span className="inline-block rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 font-semibold">
-                    Full Test Available
-                  </span>
-                  <span className="inline-block rounded-full bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 px-3 py-1 font-semibold">
-                    Timed Test
-                  </span>
-                  <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 font-semibold">
-                    All Sections
-                  </span>
-                </div>
-              </div>
-            </div>
-          </button>
-        </motion.div>
-      </div>
+             {/* Full Test Option - Spans 2 columns */}
+       <div className="mt-8">
+         <motion.div
+           initial={{ opacity: 0, y: 8 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.3 }}
+           className="col-span-2"
+         >
+           <button 
+             className="block group w-full opacity-50 cursor-not-allowed"
+             disabled={true}
+           >
+             <div className="card overflow-hidden transition-all duration-300 border-2 border-cyan-200 dark:border-cyan-800 cursor-not-allowed">
+               <div className={`h-40 bg-gradient-to-br ${fullTestOption.color} relative overflow-hidden flex items-center justify-center`}>
+                 <fullTestOption.icon className="w-20 h-20 text-white" weight="fill" />
+                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                   <span className="text-white font-bold text-lg">Coming Soon</span>
+                 </div>
+               </div>
+               <div className="p-6 space-y-3">
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <h3 className="text-2xl font-bold text-left">{fullTestOption.title}</h3>
+                     <p className="text-lg text-slate-600 dark:text-slate-400 text-left">
+                       {fullTestOption.time} • {fullTestOption.questions}
+                     </p>
+                   </div>
+                 </div>
+                 <p className="text-slate-700 dark:text-slate-300 text-left text-lg">{fullTestOption.blurb}</p>
+                 
+                 <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                   <span className="inline-block rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-3 py-1 font-semibold">
+                     Coming Soon
+                   </span>
+                   <span className="inline-block rounded-full bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 px-3 py-1 font-semibold">
+                     Timed Test
+                   </span>
+                   <span className="inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 font-semibold">
+                     All Sections
+                   </span>
+                 </div>
+               </div>
+             </div>
+           </button>
+         </motion.div>
+       </div>
     </motion.div>
   )
 }

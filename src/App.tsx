@@ -1,9 +1,13 @@
 import { lazy, Suspense, useEffect, useState, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import AuthCallback from './components/AuthCallback'
 import './index.css'
 
 const Landing = lazy(() => import('./pages/Landing'))
+const Login = lazy(() => import('./pages/Login'))
+const Signup = lazy(() => import('./pages/Signup'))
 const SubjectSelect = lazy(() => import('./pages/SubjectSelect'))
 
 const Summary = lazy(() => import('./pages/Summary'))
@@ -58,44 +62,32 @@ function App() {
   }, [])
 
   return (
-    <BrowserRouter>
-      <div className="min-h-dvh">
-        <motion.header 
-          className="sticky top-0 z-50 glass-card shadow-lg backdrop-blur-xl"
-          initial={{ y: 0 }}
-          animate={{ y: isNavVisible ? 0 : -100 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <Link to="/" className="group flex items-center gap-6">
-              <img 
-                src="/images/yellowBrain.png" 
-                alt="Brain Logo" 
-                className="w-24 h-24 group-hover:scale-110 transition-transform duration-200"
-                style={{
-                  filter: 'var(--logo-filter, hue-rotate(0deg) saturate(0.8) brightness(1.1))'
-                }}
-              />
-              <span className="text-4xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200 whitespace-nowrap">
-                TestPrep Pro
-              </span>
-            </Link>
-            <div className="flex items-center flex-1 justify-end">
-              <Nav />
-              {/* <button className="btn btn-ghost" onClick={() => setDarkMode(v => !v)}>
-                {darkMode ? 'Light' : 'Dark'}
-              </button> */}
-            </div>
-          </div>
-        </motion.header>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="min-h-dvh">
+          <ConditionalHeader isNavVisible={isNavVisible} />
 
-        <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* 
+          MAIN CONTAINER WIDTH - EASY TO MODIFY
+          Controls the maximum width of all page content across the entire app.
+          Current: 1900px (nearly full 1920px screen width for professional edge-to-edge layout)
+          To change: Modify the max-w-[1900px] value below
+          Options: max-w-[1800px], max-w-[1850px], max-w-[1900px], max-w-[1920px], etc.
+        */}
+        <main className="max-w-[1600px] mx-auto px-4 py-6">
           <Suspense fallback={<div className="text-center py-20">Loading…</div>}>
             <AnimatePresence mode="wait">
               <Routes>
                 <Route path="/" element={<PageFade>
                   <Landing />
                 </PageFade>} />
+                <Route path="/login" element={<PageFade>
+                  <Login />
+                </PageFade>} />
+                <Route path="/signup" element={<PageFade>
+                  <Signup />
+                </PageFade>} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/subjects" element={<PageFade>
                   <SubjectSelect />
                 </PageFade>} />
@@ -143,7 +135,54 @@ function App() {
           </Suspense>
         </main>
       </div>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
+
+function ConditionalHeader({ isNavVisible }: { isNavVisible: boolean }) {
+  const { user } = useAuth()
+  
+  // Only show header for authenticated users
+  if (!user) {
+    return null
+  }
+  
+  return (
+    <motion.header 
+      className="sticky top-0 z-50 glass-card shadow-lg backdrop-blur-xl"
+      initial={{ y: 0 }}
+      animate={{ y: isNavVisible ? 0 : -100 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
+    >
+                    <div className="w-full px-6 py-0.5 flex items-center justify-between">
+        <Link to="/" className="group flex items-center gap-6">
+                            <motion.img
+                    src="/images/yellowBrain.png"
+                    alt="Brain Logo"
+                    className="w-24 h-24 group-hover:scale-110 transition-transform duration-200"
+                    style={{
+                      filter: 'var(--logo-filter, hue-rotate(0deg) saturate(0.8) brightness(1.1))'
+                    }}
+                    animate={{
+                      y: [0, -10, 0]
+                    }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      repeatDelay: 2.4,
+                      ease: "easeInOut"
+                    }}
+                  />
+          <span className="text-4xl font-black text-high-contrast-bold text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200 whitespace-nowrap">
+            TestPrep Pro
+          </span>
+        </Link>
+        <div className="flex items-center flex-1 justify-end">
+          <Nav />
+        </div>
+      </div>
+    </motion.header>
   )
 }
 
@@ -167,7 +206,14 @@ export default App
 
 function Nav() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, signOut } = useAuth()
+  
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/') // Redirect to homepage after sign out
+  }
   
   const link = (to: string, label: string, isMobile = false) => {
     const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
@@ -190,11 +236,26 @@ function Nav() {
     <nav className="flex items-center gap-4 ml-auto">
       {/* Desktop Navigation */}
       {link('/', 'Home')}
-      {link('/import', 'Import')}
-      {link('/practice', 'Practice')}
-      {link('/tips', 'Tips')}
-      {link('/history', 'History')}
-      {link('/settings', 'Settings')}
+      {user ? (
+        <>
+          {link('/import', 'Import')}
+          {link('/practice', 'Practice')}
+          {link('/tips', 'Tips')}
+          {link('/history', 'History')}
+          {link('/settings', 'Settings')}
+          <button
+            onClick={handleSignOut}
+            className="hidden sm:inline-flex items-center rounded-xl px-6 py-3 text-lg font-bold text-white font-extrabold text-shadow-xl hover:bg-white/20 hover:scale-105 hover:shadow-md transition-all duration-200"
+          >
+            Sign Out
+          </button>
+        </>
+      ) : (
+        <>
+          {link('/login', 'Sign In')}
+          {link('/signup', 'Sign Up')}
+        </>
+      )}
       
       {/* Mobile Menu Button */}
       <button
@@ -211,11 +272,29 @@ function Nav() {
         <div className="absolute top-full left-0 right-0 bg-white/10 backdrop-blur-xl border-b border-white/20 sm:hidden">
           <div className="flex flex-col p-4 space-y-2">
             {link('/', 'Home', true)}
-            {link('/import', 'Import', true)}
-            {link('/practice', 'Practice', true)}
-            {link('/tips', 'Tips', true)}
-            {link('/history', 'History', true)}
-            {link('/settings', 'Settings', true)}
+            {user ? (
+              <>
+                {link('/import', 'Import', true)}
+                {link('/practice', 'Practice', true)}
+                {link('/tips', 'Tips', true)}
+                {link('/history', 'History', true)}
+                {link('/settings', 'Settings', true)}
+                <button
+                  onClick={() => {
+                    handleSignOut()
+                    setIsMobileMenuOpen(false)
+                  }}
+                  className="block w-full text-left px-4 py-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                {link('/login', 'Sign In', true)}
+                {link('/signup', 'Sign Up', true)}
+              </>
+            )}
           </div>
         </div>
       )}
