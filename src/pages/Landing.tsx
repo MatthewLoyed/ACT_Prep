@@ -68,12 +68,12 @@ export default function Landing() {
             <img 
               src="/images/yellowBrain.png" 
               alt="Brain Logo" 
-              className="w-12 h-12 group-hover:scale-110 transition-transform duration-200"
+              className="w-24 h-24 group-hover:scale-110 transition-transform duration-200"
               style={{
                 filter: 'var(--logo-filter, hue-rotate(0deg) saturate(0.8) brightness(1.1))'
               }}
             />
-            <span className="text-2xl font-bold text-white text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200">
+            <span className="text-4xl font-black text-white text-shadow-lg tracking-tight group-hover:scale-105 transition-transform duration-200">
               TestPrep Pro
             </span>
           </Link>

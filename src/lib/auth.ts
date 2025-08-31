@@ -65,18 +65,23 @@ export async function signIn(email: string, password: string) {
   return { error: null }
 }
 
-// Sign out function
+// Sign out function - now handled in AuthContext for better state management
 export async function signOut() {
   console.log('🔐 Signing out...')
   
-  const { error } = await supabase.auth.signOut()
-  
-  if (error) {
+  try {
+    const { error } = await supabase.auth.signOut()
+    
+    if (error) {
+      console.error('❌ Sign out error:', error)
+      throw error
+    }
+    
+    console.log('✅ Sign out successful')
+  } catch (error) {
     console.error('❌ Sign out error:', error)
     throw error
   }
-  
-  console.log('✅ Sign out successful')
 }
 
 // Reset password function

@@ -211,8 +211,14 @@ function Nav() {
   const { user, signOut } = useAuth()
   
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/') // Redirect to homepage after sign out
+    try {
+      await signOut()
+      navigate('/') // Redirect to homepage after sign out
+    } catch (error) {
+      console.error('Sign out failed:', error)
+      // Even if sign out fails, redirect to homepage to clear the UI
+      navigate('/')
+    }
   }
   
   const link = (to: string, label: string, isMobile = false) => {

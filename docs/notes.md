@@ -92,6 +92,11 @@
 - Consider adding social sharing features
 - Implement advanced analytics and progress insights
 
+### UI/UX Improvements Needed
+
+- **Sign Out Confirmation**: Add a confirmation dialog/modal when users click sign out to prevent accidental logouts
+- **Homepage Redesign for Authenticated Users**: Rethink the homepage experience after users are signed in - currently shows the same landing page as non-authenticated users
+
 ### Performance Optimizations
 
 - Add loading states for better UX

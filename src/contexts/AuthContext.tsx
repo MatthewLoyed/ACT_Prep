@@ -37,6 +37,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Custom sign out that handles missing sessions
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('❌ Sign out error:', error)
+        // If session is missing, manually clear the auth state
+        if (error.message?.includes('session missing')) {
+          console.log('ℹ️ Session already expired or missing - manually clearing auth state')
+          setSession(null)
+          setUser(null)
+          return
+        }
+        throw error
+      }
+      
+      console.log('✅ Sign out successful')
+    } catch (error) {
+      console.error('❌ Sign out error:', error)
+      // For any other errors, manually clear the auth state
+      setSession(null)
+      setUser(null)
+    }
+  }
+
   // Auth methods
   const authMethods: AuthContextType = {
     user,
@@ -44,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signUp,
     signIn,
-    signOut,
+    signOut: handleSignOut,
     resetPassword
   }
 
