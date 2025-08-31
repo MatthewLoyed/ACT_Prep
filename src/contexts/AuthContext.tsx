@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { signUp, signIn, signOut, resetPassword, type AuthContextType } from '../lib/auth'
+import { signUp, signIn, resetPassword, type AuthContextType } from '../lib/auth'
 
 // Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
